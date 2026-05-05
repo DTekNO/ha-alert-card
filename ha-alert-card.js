@@ -62,6 +62,7 @@ class HaAlertCard extends HTMLElement {
     this._alerts = [];
     this._dismissedAlerts = []; // dismissed but still present in entity
     this._totalUndismissed = 0;
+    this._knownIds = new Set(); // all IDs ever seen by this card instance (session)
     this._dismissed = new Set();
     this._expanded = new Set();
     this._showDismissed = false;
@@ -106,7 +107,7 @@ class HaAlertCard extends HTMLElement {
       sort_by: config.sort_by || 'severity',
       tap_action: config.tap_action || {},
       hold_action: config.hold_action || {},
-      dismiss_key: config.dismiss_key || 'ha-alert-card-dismissed',
+      dismiss_key: config.dismiss_key || this._deriveDismissKey(config.sources),
       ...config,
     };
     this._loadDismissed();
@@ -134,6 +135,17 @@ class HaAlertCard extends HTMLElement {
   }
 
   // --- Data Layer ---
+
+  _deriveDismissKey(sources) {
+    // Stable key derived from sorted entity IDs — unique per card config,
+    // consistent across reloads, no manual configuration needed.
+    const ids = sources.map(s => s.entity).sort().join(',');
+    let hash = 0;
+    for (let i = 0; i < ids.length; i++) {
+      hash = (Math.imul(31, hash) + ids.charCodeAt(i)) | 0;
+    }
+    return `ha-alert-card-${(hash >>> 0).toString(36)}`;
+  }
 
   _loadDismissed() {
     try {
@@ -229,16 +241,17 @@ class HaAlertCard extends HTMLElement {
       }
     }
 
-    // Prune dismissed IDs that are no longer in entity data,
-    // but only if we actually got data (seenIds non-empty) to avoid
-    // wiping dismissed state during a brief entity unavailability or reload.
-    // Only save if something was actually pruned — avoids overwriting
-    // localStorage before setConfig has loaded the dismissed state
-    // (hass setter runs before setConfig in HA).
+    // Accumulate all seen IDs into knownIds for this card instance.
+    for (const id of seenIds) this._knownIds.add(id);
+
+    // Prune dismissed IDs that this card has seen before but are now gone
+    // (alert expired/removed from entity). Only prune IDs known to THIS card
+    // — prevents cross-card interference when multiple cards share the same
+    // localStorage key (e.g. earthquake card pruning norway alert IDs).
     if (seenIds.size > 0) {
       let pruned = false;
       for (const id of this._dismissed) {
-        if (!seenIds.has(id)) {
+        if (this._knownIds.has(id) && !seenIds.has(id)) {
           this._dismissed.delete(id);
           pruned = true;
         }
