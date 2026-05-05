@@ -232,13 +232,18 @@ class HaAlertCard extends HTMLElement {
     // Prune dismissed IDs that are no longer in entity data,
     // but only if we actually got data (seenIds non-empty) to avoid
     // wiping dismissed state during a brief entity unavailability or reload.
+    // Only save if something was actually pruned — avoids overwriting
+    // localStorage before setConfig has loaded the dismissed state
+    // (hass setter runs before setConfig in HA).
     if (seenIds.size > 0) {
+      let pruned = false;
       for (const id of this._dismissed) {
         if (!seenIds.has(id)) {
           this._dismissed.delete(id);
+          pruned = true;
         }
       }
-      this._saveDismissed();
+      if (pruned) this._saveDismissed();
     }
 
     // Sort
