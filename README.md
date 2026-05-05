@@ -19,9 +19,13 @@ A Home Assistant Lovelace card that displays alerts from **any entity** with str
 
 ### HACS (Recommended)
 
-1. Add this repository as a custom repository in HACS (type: Dashboard/Lovelace)
-2. Install "Alert Card"
-3. Add resource if not auto-detected:
+1. Open HACS in your Home Assistant instance
+2. Click the three-dot menu (⋮) → **Custom repositories**
+3. Add the repository URL: `https://github.com/DTekNO/ha-alert-card`
+4. Category: **Dashboard** (Lovelace)
+5. Click **Add**, then find "Alert Card" in the store and click **Download**
+6. **Restart Home Assistant** (or hard-refresh browser)
+7. The resource is auto-registered. If not, add manually:
    - URL: `/hacsfiles/ha-alert-card/ha-alert-card.js`
    - Type: JavaScript Module
 
@@ -168,10 +172,15 @@ Unrecognized values get neutral gray. Add custom colors via `severity_colors`.
 
 ## Behavior
 
-- **Dismiss** — hover an alert to reveal ×. Dismissed alerts are stored in `localStorage` and hidden until the browser storage is cleared.
-- **Expand** — click an alert without a URL to expand/collapse the full description and instruction text.
-- **Navigate** — click an alert with a URL to navigate (internal `/path`) or open in new tab (external `https://...`).
+- **Tap (with URL)** — if the alert has a `url` field:
+  - Internal path (`/lovelace/...`) → navigates within HA
+  - External URL (`https://...`) → opens in new tab
+- **Tap (no URL)** — expands/collapses the alert to show full description and instruction
+- **Dismiss** — click × to hide an alert. Stored in `localStorage` per browser.
+- **Show dismissed** — click the eye icon in the header to reveal dismissed alerts with restore buttons
+- **Auto-cleanup** — dismissed alerts are automatically pruned from storage when they disappear from the entity (expired, removed by integration)
 - **Sort** — by default, highest severity first. Set `sort_by: time` for newest-first.
+- **Reorder sources** — drag sources in the visual editor to control grouping
 
 ## Compatibility
 
