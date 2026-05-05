@@ -7,8 +7,7 @@
  * Version: 0.1.0
  */
 
-const CARD_VERSION = '0.1.5';
-const CARD_COMMIT = '8990b9b';
+const CARD_VERSION = '0.2.0';
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
@@ -1835,7 +1834,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c HA-ALERT-CARD %c v${CARD_VERSION} (${CARD_COMMIT}) `,
+  `%c HA-ALERT-CARD %c v${CARD_VERSION} `,
   'color: white; background: #db4437; font-weight: bold; padding: 2px 4px; border-radius: 3px 0 0 3px;',
   'color: white; background: #333; font-weight: bold; padding: 2px 4px; border-radius: 0 3px 3px 0;'
 );
