@@ -8,6 +8,7 @@
  */
 
 const CARD_VERSION = '0.1.5';
+const CARD_COMMIT = '8990b9b';
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
@@ -207,6 +208,7 @@ class HaAlertCard extends HTMLElement {
 
         const alertObj = {
           _id: alertId,
+          _sourceIdx: this._config.sources.indexOf(source),
           _source: source.name || source.entity.split('.').pop(),
           _entity: source.entity,
           _raw: item,
@@ -320,12 +322,14 @@ class HaAlertCard extends HTMLElement {
   }
 
   _handleTap(alert) {
-    const tapAction = this._config.tap_action || {};
+    const source = this._config.sources?.[alert._sourceIdx];
+    const tapAction = source?.tap_action?.action ? source.tap_action : (this._config.tap_action || {});
     this._executeAction(tapAction, alert);
   }
 
   _handleHold(alert) {
-    const holdAction = this._config.hold_action || {};
+    const source = this._config.sources?.[alert._sourceIdx];
+    const holdAction = source?.hold_action?.action ? source.hold_action : (this._config.hold_action || {});
     if (holdAction.action) {
       this._executeAction(holdAction, alert);
     }
@@ -1180,6 +1184,46 @@ class HaAlertCardEditor extends HTMLElement {
             ${this._renderMappingField(idx, 'instruction', mapping.instruction, 'Instruction field', 'instruction')}
           </div>
         </div>
+
+        <!-- Per-source actions (override card-level) -->
+        <div class="mapping-section">
+          <div class="mapping-header">Actions (override card default)</div>
+          <div class="row">
+            <div class="mapping-field-wrap">
+              <label class="mapping-field-label">Tap action</label>
+              <select class="action-select source-action-select" data-idx="${idx}" data-action-type="tap_action">
+                <option value="" ${!source.tap_action?.action ? 'selected' : ''}>Use card default</option>
+                <option value="default" ${source.tap_action?.action === 'default' ? 'selected' : ''}>Default (URL/expand)</option>
+                <option value="more-info" ${source.tap_action?.action === 'more-info' ? 'selected' : ''}>More info</option>
+                <option value="navigate" ${source.tap_action?.action === 'navigate' ? 'selected' : ''}>Navigate</option>
+                <option value="url" ${source.tap_action?.action === 'url' ? 'selected' : ''}>Open URL</option>
+                <option value="none" ${source.tap_action?.action === 'none' ? 'selected' : ''}>None</option>
+              </select>
+            </div>
+            <div class="mapping-field-wrap">
+              <label class="mapping-field-label">Hold action</label>
+              <select class="action-select source-action-select" data-idx="${idx}" data-action-type="hold_action">
+                <option value="" ${!source.hold_action?.action ? 'selected' : ''}>Use card default</option>
+                <option value="more-info" ${source.hold_action?.action === 'more-info' ? 'selected' : ''}>More info</option>
+                <option value="navigate" ${source.hold_action?.action === 'navigate' ? 'selected' : ''}>Navigate</option>
+                <option value="url" ${source.hold_action?.action === 'url' ? 'selected' : ''}>Open URL</option>
+                <option value="none" ${source.hold_action?.action === 'none' ? 'selected' : ''}>None</option>
+              </select>
+            </div>
+          </div>
+          ${(source.tap_action?.action === 'navigate' || source.hold_action?.action === 'navigate') ? `
+            <div class="mapping-field-wrap" style="margin-top: 8px;">
+              <label class="mapping-field-label">Navigation path</label>
+              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="navigation_path" value="${source.tap_action?.navigation_path || source.hold_action?.navigation_path || ''}" placeholder="/lovelace/..." />
+            </div>
+          ` : ''}
+          ${(source.tap_action?.action === 'url' || source.hold_action?.action === 'url') ? `
+            <div class="mapping-field-wrap" style="margin-top: 8px;">
+              <label class="mapping-field-label">URL</label>
+              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="url_path" value="${source.tap_action?.url_path || source.hold_action?.url_path || ''}" placeholder="https://..." />
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   }
@@ -1367,6 +1411,43 @@ class HaAlertCardEditor extends HTMLElement {
         const mappingKey = input.dataset.mapping;
         if (isNaN(idx) || !mappingKey) return;
         this._updateMapping(idx, mappingKey, input.value.trim());
+      });
+    });
+
+    // Per-source action selects
+    root.querySelectorAll('select.source-action-select').forEach((select) => {
+      select.addEventListener('change', () => {
+        const idx = parseInt(select.dataset.idx, 10);
+        const actionType = select.dataset.actionType; // 'tap_action' or 'hold_action'
+        if (isNaN(idx) || !actionType) return;
+        const value = select.value;
+        if (value) {
+          this._updateSource(idx, actionType, { action: value });
+        } else {
+          this._updateSource(idx, actionType, undefined);
+        }
+        this._render();
+        setTimeout(() => this._setProperties(), 50);
+      });
+    });
+
+    // Per-source action path inputs
+    root.querySelectorAll('input.source-action-path').forEach((input) => {
+      input.addEventListener('change', () => {
+        const idx = parseInt(input.dataset.idx, 10);
+        const pathKey = input.dataset.actionPath; // 'navigation_path' or 'url_path'
+        if (isNaN(idx) || !pathKey) return;
+        const sources = [...(this._config.sources || [])];
+        if (!sources[idx]) return;
+        // Apply to whichever action needs it
+        if (sources[idx].tap_action?.action === 'navigate' || sources[idx].tap_action?.action === 'url') {
+          sources[idx] = { ...sources[idx], tap_action: { ...sources[idx].tap_action, [pathKey]: input.value.trim() } };
+        }
+        if (sources[idx].hold_action?.action === 'navigate' || sources[idx].hold_action?.action === 'url') {
+          sources[idx] = { ...sources[idx], hold_action: { ...sources[idx].hold_action, [pathKey]: input.value.trim() } };
+        }
+        this._config = { ...this._config, sources };
+        this._fireChanged();
       });
     });
   }
@@ -1754,7 +1835,7 @@ window.customCards.push({
 });
 
 console.info(
-  `%c HA-ALERT-CARD %c v${CARD_VERSION} `,
+  `%c HA-ALERT-CARD %c v${CARD_VERSION} (${CARD_COMMIT}) `,
   'color: white; background: #db4437; font-weight: bold; padding: 2px 4px; border-radius: 3px 0 0 3px;',
   'color: white; background: #333; font-weight: bold; padding: 2px 4px; border-radius: 0 3px 3px 0;'
 );
