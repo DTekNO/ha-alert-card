@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HA Alert Card – Interactive Mockup</title>
+  <style>
+    /* Simulate HA theme variables */
+    :root {
+      --primary-text-color: #e1e1e1;
+      --secondary-text-color: #a0a0a0;
+      --card-background-color: #1c1c1c;
+      --secondary-background-color: rgba(255,255,255,0.05);
+      --divider-color: #333;
+      --error-color: #db4437;
+      --ha-card-border-radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #111;
+      padding: 30px 20px;
+      min-height: 100vh;
+    }
+    .page-title {
+      color: var(--secondary-text-color);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .page-subtitle {
+      color: var(--secondary-text-color);
+      font-size: 12px;
+      text-align: center;
+      margin-bottom: 30px;
+      opacity: 0.6;
+    }
+
+    /* HA Section layout simulation */
+    .ha-dashboard {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .ha-section-header {
+      color: var(--secondary-text-color);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 4px 8px;
+    }
+
+    /* Simulate ha-card */
+    ha-card, .ha-card {
+      background: var(--card-background-color);
+      border-radius: var(--ha-card-border-radius);
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      margin-bottom: 20px;
+    }
+
+    /* Config panel */
+    .config-panel {
+      background: var(--card-background-color);
+      border-radius: var(--ha-card-border-radius);
+      padding: 16px;
+      margin-bottom: 20px;
+      border: 1px dashed #444;
+    }
+    .config-panel summary {
+      color: var(--primary-text-color);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .config-panel pre {
+      margin-top: 12px;
+      padding: 12px;
+      background: #111;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #8bc34a;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .demo-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .demo-btn {
+      padding: 6px 12px;
+      background: rgba(255,255,255,0.06);
+      color: var(--primary-text-color);
+      border: 1px solid #444;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .demo-btn:hover { background: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+
+<div class="page-title">HA Alert Card — Mockup</div>
+<div class="page-subtitle">Simulates how the card renders inside a Home Assistant section</div>
+
+<div class="ha-dashboard">
+
+  <!-- Config display -->
+  <div class="config-panel">
+    <details>
+      <summary>📋 Card YAML configuration (click to expand)</summary>
+      <pre id="configYaml"></pre>
+    </details>
+    <div class="demo-actions">
+      <button class="demo-btn" onclick="addAlert()">+ New alert</button>
+      <button class="demo-btn" onclick="resetAlerts()">Reset</button>
+      <button class="demo-btn" onclick="toggleTheme()">Toggle light/dark</button>
+    </div>
+  </div>
+
+  <!-- The card renders here -->
+  <div class="ha-section-header">Notifications</div>
+  <div id="cardContainer"></div>
+
+</div>
+
+<script>
+// ========================================================================
+// Simulated HA Alert Card (mirrors ha-alert-card.js logic exactly)
+// ========================================================================
+
+const DEFAULT_MAPPING = {
+  title: 'event',
+  message: 'description',
+  severity: 'severity',
+  time: 'starttime',
+  id: 'id',
+  url: 'url',
+  area: 'area',
+  instruction: 'instruction',
+};
+
+const DEFAULT_SEVERITY_COLORS = {
+  extreme: '#db4437', severe: '#ff5722', moderate: '#ff9800', minor: '#fdd835', unknown: '#9e9e9e',
+  red: '#db4437', orange: '#ff9800', yellow: '#fdd835', green: '#4caf50',
+  critical: '#db4437', high: '#ff5722', medium: '#ff9800', low: '#fdd835', info: '#2196f3',
+  open: '#ff9800', planned: '#2196f3',
+};
+
+const SEVERITY_ORDER = {
+  extreme: 100, red: 100, critical: 100,
+  severe: 80, high: 80,
+  moderate: 60, orange: 60, medium: 60,
+  minor: 40, yellow: 40, low: 40,
+  info: 20, planned: 20, green: 10,
+  unknown: 0,
+};
+
+// ========================================================================
+// Simulated entity state (mimics hass.states)
+// ========================================================================
+
+const mockEntities = {
+  'sensor.norway_alerts_vestland': {
+    state: '3',
+    attributes: {
+      alerts: [
+        {
+          id: 'met-2025-wind-001',
+          event: 'Extreme wind',
+          severity: 'Extreme',
+          description: 'Southeast storm force 10 expected. Wind gusts up to 150 km/h in exposed areas. Significant damage to buildings, trees, and infrastructure is likely.',
+          instruction: 'Secure loose objects. Avoid unnecessary travel. Stay away from large trees and construction sites.',
+          area: 'Vestland, Rogaland',
+          starttime: new Date(Date.now() - 2 * 3600000).toISOString(),
+          url: 'https://www.met.no/vaer-og-klima/ekstremvaervarsler',
+        },
+        {
+          id: 'met-2025-rain-002',
+          event: 'Heavy rain',
+          severity: 'Severe',
+          description: 'Expected 80-120mm rain in 24 hours. Risk of urban flooding, landslides in steep terrain, and rising water levels in small rivers.',
+          instruction: 'Monitor local conditions. Avoid walking/driving through flooded areas. Be prepared to evacuate if instructed.',
+          area: 'Rogaland',
+          starttime: new Date(Date.now() - 3 * 3600000).toISOString(),
+          url: 'https://www.met.no/vaer-og-klima/ekstremvaervarsler',
+        },
+        {
+          id: 'nve-2025-flood-001',
+          event: 'Flood warning',
+          severity: 'Moderate',
+          description: 'Water levels rising in Vosso and Eksingedalselva. Yellow flood warning level expected Tuesday morning. Low-lying areas near riverbanks may experience flooding.',
+          instruction: 'Keep distance from riverbanks. Monitor NVE flood warnings. Prepare sandbags if in affected area.',
+          area: 'Hordaland',
+          starttime: new Date(Date.now() - 5 * 3600000).toISOString(),
+          url: 'https://www.varsom.no/flom-og-jordskredvarsling/',
+        },
+      ]
+    }
+  },
+  'sensor.entur_sx_oslo': {
+    state: 'Disrupted',
+    attributes: {
+      all_deviations: [
+        {
+          id: 'entur-sx-2025-001',
+          summary: 'Line 1 – Signal failure at Nationaltheatret',
+          description: 'Expect delays of 10-15 minutes in both directions. Replacement bus service between Majorstuen and Jernbanetorget.',
+          status: 'open',
+          valid_from: new Date(Date.now() - 45 * 60000).toISOString(),
+        },
+        {
+          id: 'entur-sx-2025-002',
+          summary: 'Line 5 – Track maintenance Skøyen–Lysaker',
+          description: 'Planned track maintenance May 5-6. Replacement buses will run between Skøyen and Lysaker every 10 minutes.',
+          status: 'planned',
+          valid_from: new Date(Date.now() + 24 * 3600000).toISOString(),
+        },
+      ]
+    }
+  }
+};
+
+// ========================================================================
+// Card configuration (this is what users would write in YAML)
+// ========================================================================
+
+const cardConfig = {
+  type: 'custom:ha-alert-card',
+  title: 'Alerts',
+  sources: [
+    {
+      entity: 'sensor.norway_alerts_vestland',
+      name: 'Met.no',
+      // No mapping needed — uses CAP defaults!
+    },
+    {
+      entity: 'sensor.entur_sx_oslo',
+      name: 'Entur',
+      attribute: 'all_deviations',
+      mapping: {
+        title: 'summary',
+        message: 'description',
+        severity: 'status',
+        time: 'valid_from',
+        id: 'id',
+      }
+    }
+  ],
+  show_dismiss: true,
+  show_source_badge: true,
+  sort_by: 'severity',
+};
+
+// ========================================================================
+// Card rendering (mirrors ha-alert-card.js)
+// ========================================================================
+
+let dismissed = new Set();
+let expanded = new Set();
+
+function loadDismissed() {
+  try {
+    const stored = localStorage.getItem('ha-alert-card-mockup-dismissed');
+    dismissed = stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch { dismissed = new Set(); }
+}
+
+function saveDismissed() {
+  localStorage.setItem('ha-alert-card-mockup-dismissed', JSON.stringify([...dismissed]));
+}
+
+function resolveField(item, fieldPath) {
+  if (!fieldPath) return undefined;
+  const parts = fieldPath.split('.');
+  let value = item;
+  for (const part of parts) {
+    if (value == null) return undefined;
+    value = value[part];
+  }
+  return value;
+}
+
+function getAlerts() {
+  const allAlerts = [];
+  for (const source of cardConfig.sources) {
+    const entity = mockEntities[source.entity];
+    if (!entity) continue;
+    const mapping = { ...DEFAULT_MAPPING, ...(source.mapping || {}) };
+    const attribute = source.attribute || 'alerts';
+    const items = entity.attributes[attribute];
+    if (!Array.isArray(items)) continue;
+
+    for (const item of items) {
+      const alertId = resolveField(item, mapping.id) || 'unknown';
+      if (dismissed.has(alertId)) continue;
+      allAlerts.push({
+        _id: alertId,
+        _source: source.name || source.entity.split('.').pop(),
+        _entity: source.entity,
+        title: resolveField(item, mapping.title) || 'Alert',
+        message: resolveField(item, mapping.message) || '',
+        severity: (resolveField(item, mapping.severity) || 'unknown').toLowerCase(),
+        time: resolveField(item, mapping.time) || '',
+        url: resolveField(item, mapping.url) || '',
+        area: resolveField(item, mapping.area) || '',
+        instruction: resolveField(item, mapping.instruction) || '',
+      });
+    }
+  }
+
+  // Sort by severity (default)
+  allAlerts.sort((a, b) => {
+    const sa = SEVERITY_ORDER[a.severity] || 0;
+    const sb = SEVERITY_ORDER[b.severity] || 0;
+    if (sb !== sa) return sb - sa;
+    return new Date(b.time || 0) - new Date(a.time || 0);
+  });
+
+  return allAlerts;
+}
+
+function formatTime(isoString) {
+  if (!isoString) return '';
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - date;
+    if (diffMs < 0) {
+      // Future
+      const diffHrs = Math.floor(-diffMs / 3600000);
+      if (diffHrs < 24) return `in ${diffHrs}h`;
+      return `in ${Math.floor(-diffMs / 86400000)}d`;
+    }
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHrs = Math.floor(diffMs / 3600000);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    return `${Math.floor(diffMs / 86400000)}d ago`;
+  } catch { return ''; }
+}
+
+function getSeverityColor(severity) {
+  return DEFAULT_SEVERITY_COLORS[severity] || '#9e9e9e';
+}
+
+function render() {
+  const alerts = getAlerts();
+  const container = document.getElementById('cardContainer');
+
+  container.innerHTML = `
+    <div class="ha-card">
+      <style>
+        .card-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 16px 12px; border-bottom: 1px solid var(--divider-color);
+        }
+        .card-header-left { display: flex; align-items: center; gap: 10px; }
+        .card-header-left .icon { width: 20px; height: 20px; opacity: 0.8; }
+        .card-title { font-size: 16px; font-weight: 500; color: var(--primary-text-color); }
+        .badge {
+          background: var(--error-color); color: white; font-size: 11px; font-weight: 600;
+          padding: 2px 7px; border-radius: 10px; min-width: 20px; text-align: center;
+        }
+        .dismiss-all {
+          color: var(--secondary-text-color); font-size: 12px; cursor: pointer;
+          padding: 4px 8px; border-radius: 4px; transition: all 0.2s;
+        }
+        .dismiss-all:hover { color: var(--primary-text-color); background: var(--secondary-background-color); }
+
+        .alert-list { max-height: 500px; overflow-y: auto; }
+        .alert-item {
+          display: flex; align-items: stretch; border-bottom: 1px solid var(--divider-color);
+          cursor: pointer; transition: background 0.15s;
+        }
+        .alert-item:last-child { border-bottom: none; }
+        .alert-item:hover { background: var(--secondary-background-color); }
+        .severity-bar { width: 4px; flex-shrink: 0; }
+        .alert-content { flex: 1; padding: 12px; min-width: 0; }
+        .alert-top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .alert-source {
+          font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+          padding: 2px 6px; border-radius: 3px; background: var(--secondary-background-color);
+          color: var(--secondary-text-color); white-space: nowrap;
+        }
+        .alert-area { font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+        .alert-time { font-size: 11px; color: var(--secondary-text-color); margin-left: auto; white-space: nowrap; }
+        .alert-title { color: var(--primary-text-color); font-size: 14px; font-weight: 500; line-height: 1.3; margin-bottom: 3px; }
+        .alert-message {
+          color: var(--secondary-text-color); font-size: 12px; line-height: 1.4;
+          overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+          -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        }
+        .alert-item.expanded .alert-message { -webkit-line-clamp: unset; display: block; }
+        .alert-instruction {
+          margin-top: 8px; padding: 8px; background: var(--secondary-background-color);
+          border-radius: 4px; font-size: 12px; line-height: 1.4; color: var(--primary-text-color);
+        }
+        .alert-actions { display: flex; align-items: center; padding-right: 8px; gap: 4px; }
+        .dismiss-btn {
+          width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+          border-radius: 50%; cursor: pointer; transition: all 0.2s; opacity: 0;
+        }
+        .dismiss-btn svg { width: 16px; height: 16px; fill: var(--secondary-text-color); }
+        .alert-item:hover .dismiss-btn { opacity: 1; }
+        .dismiss-btn:hover { background: var(--secondary-background-color); }
+        .dismiss-btn:hover svg { fill: var(--primary-text-color); }
+        .chevron { display: flex; align-items: center; opacity: 0.3; }
+        .chevron svg { width: 16px; height: 16px; fill: var(--secondary-text-color); }
+        .empty-state { padding: 32px 20px; text-align: center; color: var(--secondary-text-color); }
+        .empty-state svg { width: 40px; height: 40px; fill: var(--secondary-text-color); opacity: 0.3; margin-bottom: 8px; }
+
+        @keyframes slideIn { from { transform: translateX(-8px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .alert-item.new-item { animation: slideIn 0.3s ease-out; }
+      </style>
+
+      <div class="card-header">
+        <div class="card-header-left">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor" style="color: var(--primary-text-color)">
+            <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+          <span class="card-title">${cardConfig.title}</span>
+          ${alerts.length > 0 ? `<span class="badge">${alerts.length}</span>` : ''}
+        </div>
+        ${alerts.length > 0 ? `<span class="dismiss-all" onclick="dismissAll()">Dismiss all</span>` : ''}
+      </div>
+      <div class="alert-list">
+        ${alerts.length === 0 ? `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            <div>No active alerts</div>
+          </div>
+        ` : alerts.map(a => renderAlert(a)).join('')}
+      </div>
+    </div>
+  `;
+
+  updateConfigDisplay();
+}
+
+function renderAlert(alert) {
+  const isExpanded = expanded.has(alert._id);
+  const color = getSeverityColor(alert.severity);
+  const timeStr = formatTime(alert.time);
+  const chevronIcon = alert.url
+    ? '<path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>'
+    : (isExpanded ? '<path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>' : '<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>');
+
+  return `
+    <div class="alert-item ${isExpanded ? 'expanded' : ''}" onclick="handleTap('${alert._id}', '${alert.url}')">
+      <div class="severity-bar" style="background: ${color}"></div>
+      <div class="alert-content">
+        <div class="alert-top-row">
+          <span class="alert-source">${alert._source}</span>
+          ${alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
+          ${timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
+        </div>
+        <div class="alert-title">${alert.title}</div>
+        ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+        ${isExpanded && alert.instruction ? `
+          <div class="alert-instruction"><strong>Instruction:</strong> ${alert.instruction}</div>
+        ` : ''}
+      </div>
+      <div class="alert-actions">
+        <div class="dismiss-btn" onclick="dismissAlert(event, '${alert._id}')" title="Dismiss">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </div>
+        <div class="chevron">
+          <svg viewBox="0 0 24 24">${chevronIcon}</svg>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ========================================================================
+// Actions
+// ========================================================================
+
+function handleTap(alertId, url) {
+  if (url) {
+    showToast(`🔗 tap_action → navigate: ${url}`);
+  } else {
+    if (expanded.has(alertId)) expanded.delete(alertId);
+    else expanded.add(alertId);
+    render();
+  }
+}
+
+function dismissAlert(event, alertId) {
+  event.stopPropagation();
+  dismissed.add(alertId);
+  saveDismissed();
+  render();
+}
+
+function dismissAll() {
+  const alerts = getAlerts();
+  for (const a of alerts) dismissed.add(a._id);
+  saveDismissed();
+  render();
+}
+
+function addAlert() {
+  const newId = 'entur-sx-' + Date.now();
+  mockEntities['sensor.entur_sx_oslo'].attributes.all_deviations.unshift({
+    id: newId,
+    summary: 'Line 3 – Overhead wire damage near Skøyen',
+    description: 'Service suspended between Skøyen and Lysaker due to overhead wire damage. Replacement buses running every 10 minutes. Expected resolved by 16:00.',
+    status: 'open',
+    valid_from: new Date().toISOString(),
+  });
+  render();
+}
+
+function resetAlerts() {
+  dismissed.clear();
+  expanded.clear();
+  saveDismissed();
+  // Reset mock data
+  mockEntities['sensor.entur_sx_oslo'].attributes.all_deviations = [
+    {
+      id: 'entur-sx-2025-001',
+      summary: 'Line 1 – Signal failure at Nationaltheatret',
+      description: 'Expect delays of 10-15 minutes in both directions. Replacement bus service between Majorstuen and Jernbanetorget.',
+      status: 'open',
+      valid_from: new Date(Date.now() - 45 * 60000).toISOString(),
+    },
+    {
+      id: 'entur-sx-2025-002',
+      summary: 'Line 5 – Track maintenance Skøyen–Lysaker',
+      description: 'Planned track maintenance May 5-6. Replacement buses will run between Skøyen and Lysaker every 10 minutes.',
+      status: 'planned',
+      valid_from: new Date(Date.now() + 24 * 3600000).toISOString(),
+    },
+  ];
+  render();
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.style.getPropertyValue('--primary-text-color') !== '#1c1c1c';
+  if (isDark) {
+    root.style.setProperty('--primary-text-color', '#1c1c1c');
+    root.style.setProperty('--secondary-text-color', '#666');
+    root.style.setProperty('--card-background-color', '#ffffff');
+    root.style.setProperty('--secondary-background-color', 'rgba(0,0,0,0.04)');
+    root.style.setProperty('--divider-color', '#e0e0e0');
+    document.body.style.background = '#f0f0f0';
+  } else {
+    root.style.setProperty('--primary-text-color', '#e1e1e1');
+    root.style.setProperty('--secondary-text-color', '#a0a0a0');
+    root.style.setProperty('--card-background-color', '#1c1c1c');
+    root.style.setProperty('--secondary-background-color', 'rgba(255,255,255,0.05)');
+    root.style.setProperty('--divider-color', '#333');
+    document.body.style.background = '#111';
+  }
+}
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+function updateConfigDisplay() {
+  document.getElementById('configYaml').textContent =
+`type: custom:ha-alert-card
+title: Alerts
+sources:
+  # norway_alerts — CAP-native, zero mapping needed
+  - entity: sensor.norway_alerts_vestland
+    name: Met.no
+    # attribute: alerts        ← default
+    # mapping: uses CAP defaults (event, description, severity, starttime, id, url, area, instruction)
+
+  # Entur SX — different field names, needs mapping
+  - entity: sensor.entur_sx_oslo
+    name: Entur
+    attribute: all_deviations  # not the default 'alerts'
+    mapping:
+      title: summary           # instead of CAP 'event'
+      message: description     # same as CAP default
+      severity: status         # 'open'/'planned' instead of CAP severity
+      time: valid_from         # instead of CAP 'starttime'
+      id: id                   # same as default`;
+}
+
+// ========================================================================
+// Init
+// ========================================================================
+loadDismissed();
+render();
+</script>
+</body>
+</html>
