@@ -102,8 +102,9 @@ class HaAlertCard extends HTMLElement {
       show_source_badge: config.show_source_badge !== false,
       show_area: config.show_area !== false,
       show_time: config.show_time !== false,
-      sort_by: config.sort_by || 'severity', // 'severity' or 'time'
-      tap_action: config.tap_action || { action: 'more-info' },
+      sort_by: config.sort_by || 'severity',
+      tap_action: config.tap_action || {},
+      hold_action: config.hold_action || {},
       dismiss_key: config.dismiss_key || 'ha-alert-card-dismissed',
       ...config,
     };
@@ -319,22 +320,64 @@ class HaAlertCard extends HTMLElement {
   }
 
   _handleTap(alert) {
-    if (alert.url) {
-      // Navigate to URL
-      const event = new Event('hass-more-info', { bubbles: true, composed: true });
-      if (alert.url.startsWith('/')) {
-        window.history.pushState(null, '', alert.url);
-        window.dispatchEvent(new Event('location-changed'));
-      } else if (alert.url.startsWith('http')) {
-        window.open(alert.url, '_blank', 'noopener');
-      } else {
-        // Treat as entity for more-info dialog
-        event.detail = { entityId: alert._entity };
+    const tapAction = this._config.tap_action || {};
+    this._executeAction(tapAction, alert);
+  }
+
+  _handleHold(alert) {
+    const holdAction = this._config.hold_action || {};
+    if (holdAction.action) {
+      this._executeAction(holdAction, alert);
+    }
+  }
+
+  _executeAction(actionConfig, alert) {
+    const action = actionConfig.action || 'default';
+
+    switch (action) {
+      case 'more-info': {
+        const event = new CustomEvent('hass-more-info', {
+          bubbles: true, composed: true,
+          detail: { entityId: alert._entity },
+        });
         this.dispatchEvent(event);
+        break;
       }
-    } else {
-      // Default: toggle expand to show details
-      this._toggleExpand(alert._id);
+      case 'navigate': {
+        const path = actionConfig.navigation_path;
+        if (path) {
+          window.history.pushState(null, '', path);
+          window.dispatchEvent(new Event('location-changed'));
+        }
+        break;
+      }
+      case 'url': {
+        const url = actionConfig.url_path;
+        if (url) window.open(url, '_blank', 'noopener');
+        break;
+      }
+      case 'none':
+        break;
+      case 'default':
+      default:
+        // Default behavior: URL in alert → navigate/open, else expand
+        if (alert.url) {
+          if (alert.url.startsWith('/')) {
+            window.history.pushState(null, '', alert.url);
+            window.dispatchEvent(new Event('location-changed'));
+          } else if (alert.url.startsWith('http')) {
+            window.open(alert.url, '_blank', 'noopener');
+          } else {
+            const event = new CustomEvent('hass-more-info', {
+              bubbles: true, composed: true,
+              detail: { entityId: alert._entity },
+            });
+            this.dispatchEvent(event);
+          }
+        } else {
+          this._toggleExpand(alert._id);
+        }
+        break;
     }
   }
 
@@ -427,7 +470,23 @@ class HaAlertCard extends HTMLElement {
       const alert = this._alerts.find(a => a._id === alertId);
       if (!alert) return;
 
+      // Tap
       el.addEventListener('click', () => this._handleTap(alert));
+
+      // Hold (long press)
+      let holdTimer = null;
+      let held = false;
+      el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        held = false;
+        holdTimer = setTimeout(() => {
+          held = true;
+          this._handleHold(alert);
+        }, 500);
+      });
+      el.addEventListener('pointerup', () => { clearTimeout(holdTimer); });
+      el.addEventListener('pointercancel', () => { clearTimeout(holdTimer); });
+      el.addEventListener('click', (e) => { if (held) { e.stopImmediatePropagation(); held = false; } }, true);
 
       const dismissBtn = el.querySelector('.dismiss-btn');
       if (dismissBtn) {
@@ -851,78 +910,144 @@ class HaAlertCardEditor extends HTMLElement {
   _render() {
     const config = this._config;
     const sources = config.sources || [];
+    const tapAction = config.tap_action || {};
+    const holdAction = config.hold_action || {};
 
     this.shadowRoot.innerHTML = `
       <style>${this._getEditorStyles()}</style>
       <div class="editor">
 
-        <!-- Card Settings -->
-        <div class="section">
-          <div class="section-title">Card Settings</div>
-          <div class="mapping-field-wrap">
-            <label class="mapping-field-label">Title</label>
-            <input
-              type="text"
-              class="source-field-input"
-              id="title-input"
-              value="${config.title || 'Alerts'}"
-              placeholder="Alerts"
-            />
+        <!-- Appearance -->
+        <ha-expansion-panel outlined>
+          <div slot="header" class="panel-header">
+            <ha-icon icon="mdi:palette-outline"></ha-icon>
+            <span>Appearance</span>
           </div>
-          <div class="row">
+          <div class="panel-content">
             <div class="mapping-field-wrap">
-              <label class="mapping-field-label">Max items</label>
+              <label class="mapping-field-label">Title</label>
               <input
-                type="number"
+                type="text"
                 class="source-field-input"
-                id="max-items-input"
-                value="${config.max_items || 20}"
-                min="1"
-                max="50"
+                id="title-input"
+                value="${config.title || 'Alerts'}"
+                placeholder="Alerts"
               />
             </div>
-            <div class="select-wrapper">
-              <label class="select-label">Sort by</label>
-              <select id="sort-select">
-                <option value="severity" ${(config.sort_by || 'severity') === 'severity' ? 'selected' : ''}>Severity</option>
-                <option value="time" ${config.sort_by === 'time' ? 'selected' : ''}>Time</option>
-              </select>
+            <div class="row">
+              <div class="mapping-field-wrap">
+                <label class="mapping-field-label">Max items</label>
+                <input
+                  type="number"
+                  class="source-field-input"
+                  id="max-items-input"
+                  value="${config.max_items || 20}"
+                  min="1"
+                  max="50"
+                />
+              </div>
+              <div class="select-wrapper">
+                <label class="select-label">Sort by</label>
+                <select id="sort-select">
+                  <option value="severity" ${(config.sort_by || 'severity') === 'severity' ? 'selected' : ''}>Severity</option>
+                  <option value="time" ${config.sort_by === 'time' ? 'selected' : ''}>Time</option>
+                </select>
+              </div>
+            </div>
+            <div class="switches">
+              <label class="switch-row">
+                <ha-switch id="show-dismiss"></ha-switch>
+                <span>Show dismiss buttons</span>
+              </label>
+              <label class="switch-row">
+                <ha-switch id="show-source"></ha-switch>
+                <span>Show source badges</span>
+              </label>
+              <label class="switch-row">
+                <ha-switch id="show-time"></ha-switch>
+                <span>Show time</span>
+              </label>
+              <label class="switch-row">
+                <ha-switch id="show-area"></ha-switch>
+                <span>Show area</span>
+              </label>
             </div>
           </div>
-          <div class="switches">
-            <label class="switch-row">
-              <ha-switch id="show-dismiss"></ha-switch>
-              <span>Show dismiss buttons</span>
-            </label>
-            <label class="switch-row">
-              <ha-switch id="show-source"></ha-switch>
-              <span>Show source badges</span>
-            </label>
-            <label class="switch-row">
-              <ha-switch id="show-time"></ha-switch>
-              <span>Show time</span>
-            </label>
-            <label class="switch-row">
-              <ha-switch id="show-area"></ha-switch>
-              <span>Show area</span>
-            </label>
-          </div>
-        </div>
+        </ha-expansion-panel>
 
         <!-- Sources -->
-        <div class="section">
-          <div class="section-title">
-            Sources
-            <span class="hint-inline">Entities providing alert data</span>
+        <ha-expansion-panel outlined expanded>
+          <div slot="header" class="panel-header">
+            <ha-icon icon="mdi:database-outline"></ha-icon>
+            <span>Sources</span>
+            <span class="panel-badge">${sources.length}</span>
           </div>
-          <div class="sources-list" id="sourcesList">
-            ${sources.map((src, idx) => this._renderSource(src, idx)).join('')}
+          <div class="panel-content">
+            <div class="sources-list" id="sourcesList">
+              ${sources.map((src, idx) => this._renderSource(src, idx)).join('')}
+            </div>
+            <button class="add-btn" id="addSourceBtn">
+              <ha-icon icon="mdi:plus"></ha-icon>
+              Add source
+            </button>
           </div>
-          <button class="add-btn" id="addSourceBtn">
-            <ha-icon icon="mdi:plus"></ha-icon>
-            Add source
-          </button>
-        </div>
+        </ha-expansion-panel>
+
+        <!-- Interactions -->
+        <ha-expansion-panel outlined>
+          <div slot="header" class="panel-header">
+            <ha-icon icon="mdi:gesture-tap"></ha-icon>
+            <span>Interactions</span>
+          </div>
+          <div class="panel-content">
+            <div class="action-group">
+              <label class="mapping-field-label">Tap action</label>
+              <p class="action-hint">What happens when you tap an alert</p>
+              <select id="tap-action-select" class="action-select">
+                <option value="default" ${(!tapAction.action || tapAction.action === 'default') ? 'selected' : ''}>Default (URL → navigate, else expand)</option>
+                <option value="more-info" ${tapAction.action === 'more-info' ? 'selected' : ''}>More info (source entity)</option>
+                <option value="navigate" ${tapAction.action === 'navigate' ? 'selected' : ''}>Navigate to path</option>
+                <option value="url" ${tapAction.action === 'url' ? 'selected' : ''}>Open URL</option>
+                <option value="none" ${tapAction.action === 'none' ? 'selected' : ''}>None (no action)</option>
+              </select>
+              ${tapAction.action === 'navigate' ? `
+                <div class="mapping-field-wrap" style="margin-top: 8px;">
+                  <label class="mapping-field-label">Navigation path</label>
+                  <input type="text" class="source-field-input" id="tap-nav-path" value="${tapAction.navigation_path || ''}" placeholder="/lovelace/alerts" />
+                </div>
+              ` : ''}
+              ${tapAction.action === 'url' ? `
+                <div class="mapping-field-wrap" style="margin-top: 8px;">
+                  <label class="mapping-field-label">URL</label>
+                  <input type="text" class="source-field-input" id="tap-url" value="${tapAction.url_path || ''}" placeholder="https://..." />
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="action-group">
+              <label class="mapping-field-label">Hold action</label>
+              <p class="action-hint">What happens on long press</p>
+              <select id="hold-action-select" class="action-select">
+                <option value="none" ${(!holdAction.action || holdAction.action === 'none') ? 'selected' : ''}>None</option>
+                <option value="more-info" ${holdAction.action === 'more-info' ? 'selected' : ''}>More info (source entity)</option>
+                <option value="navigate" ${holdAction.action === 'navigate' ? 'selected' : ''}>Navigate to path</option>
+                <option value="url" ${holdAction.action === 'url' ? 'selected' : ''}>Open URL</option>
+              </select>
+              ${holdAction.action === 'navigate' ? `
+                <div class="mapping-field-wrap" style="margin-top: 8px;">
+                  <label class="mapping-field-label">Navigation path</label>
+                  <input type="text" class="source-field-input" id="hold-nav-path" value="${holdAction.navigation_path || ''}" placeholder="/lovelace/alerts" />
+                </div>
+              ` : ''}
+              ${holdAction.action === 'url' ? `
+                <div class="mapping-field-wrap" style="margin-top: 8px;">
+                  <label class="mapping-field-label">URL</label>
+                  <input type="text" class="source-field-input" id="hold-url" value="${holdAction.url_path || ''}" placeholder="https://..." />
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </ha-expansion-panel>
 
         <!-- Help -->
         <div class="help-text">
@@ -1108,6 +1233,40 @@ class HaAlertCardEditor extends HTMLElement {
       this._updateConfig('show_area', e.target.checked);
     });
 
+    // Tap action
+    root.getElementById('tap-action-select')?.addEventListener('change', (e) => {
+      const action = e.target.value;
+      const tapAction = action === 'default' ? {} : { action };
+      this._updateConfig('tap_action', tapAction);
+      this._render();
+      setTimeout(() => this._setProperties(), 50);
+    });
+    root.getElementById('tap-nav-path')?.addEventListener('change', (e) => {
+      const tapAction = { ...this._config.tap_action, navigation_path: e.target.value.trim() };
+      this._updateConfig('tap_action', tapAction);
+    });
+    root.getElementById('tap-url')?.addEventListener('change', (e) => {
+      const tapAction = { ...this._config.tap_action, url_path: e.target.value.trim() };
+      this._updateConfig('tap_action', tapAction);
+    });
+
+    // Hold action
+    root.getElementById('hold-action-select')?.addEventListener('change', (e) => {
+      const action = e.target.value;
+      const holdAction = action === 'none' ? {} : { action };
+      this._updateConfig('hold_action', holdAction);
+      this._render();
+      setTimeout(() => this._setProperties(), 50);
+    });
+    root.getElementById('hold-nav-path')?.addEventListener('change', (e) => {
+      const holdAction = { ...this._config.hold_action, navigation_path: e.target.value.trim() };
+      this._updateConfig('hold_action', holdAction);
+    });
+    root.getElementById('hold-url')?.addEventListener('change', (e) => {
+      const holdAction = { ...this._config.hold_action, url_path: e.target.value.trim() };
+      this._updateConfig('hold_action', holdAction);
+    });
+
     // Add source button
     root.getElementById('addSourceBtn')?.addEventListener('click', () => {
       this._config.sources = [...(this._config.sources || []), { entity: '' }];
@@ -1265,6 +1424,64 @@ class HaAlertCardEditor extends HTMLElement {
     return `
       .editor {
         padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      ha-expansion-panel {
+        display: block;
+        --expansion-panel-content-padding: 0;
+        border-radius: 6px;
+        --ha-card-border-radius: 6px;
+      }
+      .panel-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .panel-header ha-icon {
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
+      }
+      .panel-badge {
+        background: var(--primary-color, #03a9f4);
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 8px;
+        margin-left: auto;
+      }
+      .panel-content {
+        padding: 12px 16px 16px;
+      }
+      .action-group {
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--divider-color, #e0e0e0);
+      }
+      .action-group:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+      .action-hint {
+        font-size: 11px;
+        color: var(--secondary-text-color);
+        margin: 2px 0 8px;
+      }
+      .action-select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--divider-color, #ccc);
+        background: var(--card-background-color, var(--ha-card-background, #fff));
+        color: var(--primary-text-color);
+        font-size: 14px;
+        appearance: auto;
+        cursor: pointer;
       }
       .section {
         margin-bottom: 20px;
