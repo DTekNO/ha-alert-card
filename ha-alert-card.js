@@ -61,6 +61,7 @@ class HaAlertCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._alerts = [];
     this._dismissedAlerts = []; // dismissed but still present in entity
+    this._totalUndismissed = 0;
     this._dismissed = new Set();
     this._expanded = new Set();
     this._showDismissed = false;
@@ -252,9 +253,11 @@ class HaAlertCard extends HTMLElement {
           return tb - ta;
         };
 
+    // Sort independently. max_items caps only the undismissed visible window —
+    // dismissing an alert reveals the next one (dismiss-as-paging).
     allAlerts.sort(sortFn);
     dismissedAlerts.sort(sortFn);
-
+    this._totalUndismissed = allAlerts.length;
     this._alerts = allAlerts.slice(0, this._config.max_items);
     this._dismissedAlerts = dismissedAlerts;
   }
@@ -430,7 +433,7 @@ class HaAlertCard extends HTMLElement {
           <div class="card-header-left">
             <ha-icon icon="mdi:bell-alert-outline"></ha-icon>
             <span class="card-title">${this._config.title}</span>
-            ${alertCount > 0 ? `<span class="badge">${alertCount}</span>` : ''}
+            ${alertCount > 0 ? `<span class="badge">${alertCount}${this._totalUndismissed > alertCount ? ` of ${this._totalUndismissed}` : ''}</span>` : ''}
           </div>
           <div class="card-header-right">
             ${dismissedCount > 0 ? `
@@ -440,7 +443,7 @@ class HaAlertCard extends HTMLElement {
               </span>
             ` : ''}
             ${alertCount > 0 && this._config.show_dismiss ? `
-              <span class="dismiss-all" id="dismissAll">Dismiss all</span>
+              <span class="dismiss-all" id="dismissAll">${this._totalUndismissed > alertCount ? 'Dismiss visible' : 'Dismiss all'}</span>
             ` : ''}
           </div>
         </div>

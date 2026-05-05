@@ -182,11 +182,91 @@ Unrecognized values get neutral gray. Add custom colors via `severity_colors`.
 - **Sort** — by default, highest severity first. Set `sort_by: time` for newest-first.
 - **Reorder sources** — drag sources in the visual editor to control grouping
 
+## Examples
+
+### USGS Earthquake Feed
+
+Uses the USGS public GeoJSON feed via HA's built-in REST integration. No account or API key required.
+
+**`configuration.yaml`:**
+```yaml
+rest:
+  - resource: https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson
+    sensor:
+      - name: "USGS Earthquakes"
+        value_template: "{{ value_json.features | length }}"
+        json_attributes:
+          - features
+```
+
+**Card config:**
+```yaml
+type: custom:ha-alert-card
+title: Earthquakes
+sources:
+  - entity: sensor.usgs_earthquakes
+    name: USGS
+    attribute: features
+    mapping:
+      title: properties.title
+      area: properties.place
+      severity: properties.alert
+      url: properties.url
+      id: id
+      time: properties.time
+grid_options:
+  columns: full
+  rows: 8
+```
+
+Notes:
+- `properties.alert` is the USGS PAGER impact level (`green`/`yellow`/`orange`/`red`). Only populated for significant earthquakes — smaller quakes show as grey.
+- `properties.time` is a Unix millisecond timestamp — the card handles this correctly and displays relative times ("2h ago", etc.).
+- Consider filtering by area if you want to reduce the payload, e.g. `?minmagnitude=4.5` appended to the resource URL.
+
+### US National Weather Service Alerts
+
+```yaml
+rest:
+  - resource: https://api.weather.gov/alerts/active?area=CA
+    headers:
+      User-Agent: HomeAssistant
+      Accept: application/geo+json
+    sensor:
+      - name: "NWS Active Alerts"
+        value_template: "{{ value_json.features | length }}"
+        json_attributes:
+          - features
+```
+
+```yaml
+type: custom:ha-alert-card
+title: US Weather Alerts
+sources:
+  - entity: sensor.nws_active_alerts
+    name: NWS
+    attribute: features
+    mapping:
+      title: properties.event
+      message: properties.headline
+      severity: properties.severity
+      area: properties.areaDesc
+      time: properties.onset
+      id: properties.id
+```
+
+Notes:
+- The `User-Agent` header is required by the NWS API.
+- Filter by state with `?area=CA`, `?area=TX`, etc. Without a filter the full US feed can be very large.
+- `properties.severity` values are CAP-standard (`Extreme`/`Severe`/`Moderate`/`Minor`) and map directly to the card's built-in color scheme.
+
 ## Compatibility
 
 Tested with:
 - [Norway Alerts](https://github.com/jnxxx/homeassistant-norway_alerts) (CAP-native, zero-config)
 - [Entur SX](https://github.com/jnxxx/ha-entur_sx) (with mapping)
+- USGS Earthquake GeoJSON feed (via REST sensor, see example above)
+- US National Weather Service alerts API (via REST sensor, see example above)
 
 Should work with any integration that stores structured alerts in entity attributes.
 
