@@ -229,13 +229,17 @@ class HaAlertCard extends HTMLElement {
       }
     }
 
-    // Prune dismissed IDs that are no longer in entity data
-    for (const id of this._dismissed) {
-      if (!seenIds.has(id)) {
-        this._dismissed.delete(id);
+    // Prune dismissed IDs that are no longer in entity data,
+    // but only if we actually got data (seenIds non-empty) to avoid
+    // wiping dismissed state during a brief entity unavailability or reload.
+    if (seenIds.size > 0) {
+      for (const id of this._dismissed) {
+        if (!seenIds.has(id)) {
+          this._dismissed.delete(id);
+        }
       }
+      this._saveDismissed();
     }
-    this._saveDismissed();
 
     // Sort
     const sortFn = this._config.sort_by === 'time'
