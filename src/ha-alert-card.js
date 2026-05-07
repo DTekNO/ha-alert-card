@@ -7,7 +7,7 @@
  * Version: 0.1.0
  */
 
-const CARD_VERSION = '0.2.2';
+const CARD_VERSION = 'src-raw';
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
