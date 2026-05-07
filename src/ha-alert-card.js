@@ -98,20 +98,23 @@ class HaAlertCard extends HTMLElement {
         this._render();
       });
     } else if (this._dismissedLoaded) {
-      // Only re-render if entity state data actually changed.
       const stateFingerprint = this._getEntityFingerprint(hass);
-      if (stateFingerprint === this._lastEntityStates) return;
-      this._lastEntityStates = stateFingerprint;
+      const entitiesChanged = stateFingerprint !== this._lastEntityStates;
+      if (entitiesChanged) this._lastEntityStates = stateFingerprint;
 
-      // Throttle cross-device dismissed sync to once per 30 seconds.
+      // Throttle cross-device dismissed sync to once per 10 seconds,
+      // independent of whether entities changed.
       const now = Date.now();
-      const syncPromise = (now - this._lastSyncTime > 30000)
-        ? (this._lastSyncTime = now, this._syncDismissed())
-        : Promise.resolve();
+      const shouldSync = now - this._lastSyncTime > 10000;
+      if (shouldSync) this._lastSyncTime = now;
 
-      syncPromise.then(() => {
-        this._updateAlerts();
-        this._render();
+      const syncPromise = shouldSync ? this._syncDismissed() : Promise.resolve(false);
+
+      syncPromise.then((dismissedChanged) => {
+        if (entitiesChanged || dismissedChanged) {
+          this._updateAlerts();
+          this._render();
+        }
       });
     }
   }
@@ -187,8 +190,8 @@ class HaAlertCard extends HTMLElement {
 
   async _syncDismissed() {
     // Re-fetch server state and update local if it differs.
-    // Allows dismissals on other devices to propagate to this one.
-    if (!this._hass) return;
+    // Returns true if the dismissed set changed (so caller can decide to re-render).
+    if (!this._hass) return false;
     try {
       const result = await this._hass.callWS({
         type: 'frontend/get_user_data',
@@ -196,13 +199,13 @@ class HaAlertCard extends HTMLElement {
       });
       const serverIds = result?.value ?? [];
       const serverSet = new Set(serverIds);
-      // Only update if server state differs from local to avoid thrashing.
       const localIds = [...this._dismissed];
       const changed = serverSet.size !== this._dismissed.size ||
         serverIds.some(id => !this._dismissed.has(id)) ||
         localIds.some(id => !serverSet.has(id));
       if (changed) this._dismissed = serverSet;
-    } catch { /* ignore sync errors */ }
+      return changed;
+    } catch { return false; }
   }
 
   async _loadDismissed() {
