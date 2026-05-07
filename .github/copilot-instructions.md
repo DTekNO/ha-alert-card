@@ -3,7 +3,7 @@
 ## Project structure
 
 - `src/ha-alert-card.js` — source of truth. This is the only file to edit when developing.
-- `dist/` — release output folder. Contains only `.gitkeep` in git. **Never edit or commit files here.** Populated by the release workflow at release time. `dist/*.js` is gitignored.
+- `dist/ha-alert-card.js` — last built snapshot, committed to repo so HACS can validate the repository structure. **Never edit directly.** The release workflow overwrites it (in CI only) with the version-injected build from `src/`. It is fine for the committed copy to have an older/placeholder version number.
 - `hacs.json` — points HACS to the `dist/` folder and release assets.
 
 ## Release workflow
@@ -19,5 +19,5 @@ HACS downloads the release asset from `dist/`, which always has the correct inje
 
 - Always edit `src/ha-alert-card.js`, never `dist/ha-alert-card.js`.
 - Keep `const CARD_VERSION = '0.0.0';` (or any placeholder) in `src/` — the real version is injected at release time.
-- Do not commit anything to `dist/` — it is gitignored except for `.gitkeep`.
+- Do not manually update `dist/ha-alert-card.js` — it is overwritten by the release workflow in CI.
 - To release: push a tag `vX.Y.Z` and publish a GitHub release — the workflow handles the rest.
