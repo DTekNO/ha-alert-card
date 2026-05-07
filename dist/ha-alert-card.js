@@ -118,7 +118,8 @@ class HaAlertCard extends HTMLElement {
       show_source_badge: config.show_source_badge !== false,
       show_area: config.show_area !== false,
       show_time: config.show_time !== false,
-      hide_when_empty: config.hide_when_empty || false,
+      hide_when_no_alerts: config.hide_when_no_alerts || false,
+      hide_when_all_dismissed: config.hide_when_all_dismissed || false,
       sort_by: config.sort_by || 'severity',
       tap_action: config.tap_action || {},
       hold_action: config.hold_action || {},
@@ -504,8 +505,13 @@ class HaAlertCard extends HTMLElement {
     const alertCount = this._alerts.length;
     const dismissedCount = this._dismissedAlerts.length;
 
-    // Hide the entire card when empty if configured.
-    if (this._config.hide_when_empty && alertCount === 0 && dismissedCount === 0) {
+    // Hide card based on visibility toggles.
+    const totalAlerts = alertCount + dismissedCount;
+    if (this._config.hide_when_no_alerts && totalAlerts === 0) {
+      this.style.display = 'none';
+      return;
+    }
+    if (this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0) {
       this.style.display = 'none';
       return;
     }
@@ -1063,8 +1069,12 @@ class HaAlertCardEditor extends HTMLElement {
                 <span>Show area</span>
               </label>
               <label class="switch-row">
-                <ha-switch id="hide-when-empty"></ha-switch>
-                <span>Hide card when no alerts</span>
+                <ha-switch id="hide-when-no-alerts"></ha-switch>
+                <span>Hide card when no alerts exist</span>
+              </label>
+              <label class="switch-row">
+                <ha-switch id="hide-when-all-dismissed"></ha-switch>
+                <span>Hide card when all alerts are dismissed</span>
               </label>
             </div>
           </div>
@@ -1175,8 +1185,10 @@ class HaAlertCardEditor extends HTMLElement {
     if (showTime) showTime.checked = config.show_time !== false;
     const showArea = root.getElementById('show-area');
     if (showArea) showArea.checked = config.show_area !== false;
-    const hideWhenEmpty = root.getElementById('hide-when-empty');
-    if (hideWhenEmpty) hideWhenEmpty.checked = !!config.hide_when_empty;
+    const hideWhenNoAlerts = root.getElementById('hide-when-no-alerts');
+    if (hideWhenNoAlerts) hideWhenNoAlerts.checked = !!config.hide_when_no_alerts;
+    const hideWhenAllDismissed = root.getElementById('hide-when-all-dismissed');
+    if (hideWhenAllDismissed) hideWhenAllDismissed.checked = !!config.hide_when_all_dismissed;
 
     // Values for source fields and mapping inputs are set via the value attribute in innerHTML
   }
@@ -1369,8 +1381,11 @@ class HaAlertCardEditor extends HTMLElement {
     root.getElementById('show-area')?.addEventListener('change', (e) => {
       this._updateConfig('show_area', e.target.checked);
     });
-    root.getElementById('hide-when-empty')?.addEventListener('change', (e) => {
-      this._updateConfig('hide_when_empty', e.target.checked);
+    root.getElementById('hide-when-no-alerts')?.addEventListener('change', (e) => {
+      this._updateConfig('hide_when_no_alerts', e.target.checked);
+    });
+    root.getElementById('hide-when-all-dismissed')?.addEventListener('change', (e) => {
+      this._updateConfig('hide_when_all_dismissed', e.target.checked);
     });
 
     // Tap action
