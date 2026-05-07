@@ -17,6 +17,9 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Build dist from src
+        run: cp src/ha-alert-card.js dist/ha-alert-card.js
+
       - name: Inject version into JS
         run: |
           sed -i "s/const CARD_VERSION = '[^']*'/const CARD_VERSION = '${{ steps.get_version.outputs.VERSION }}'/" dist/ha-alert-card.js
