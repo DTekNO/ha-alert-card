@@ -1,6 +1,5 @@
 {
   "name": "Alert Card",
   "render_readme": true,
-  "filename": "ha-alert-card.js",
-  "content_in_root": true
+  "filename": "ha-alert-card.js"
 }
