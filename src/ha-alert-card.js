@@ -669,6 +669,15 @@ class HaAlertCard extends HTMLElement {
               <strong>Instruction:</strong> ${alert.instruction}
             </div>
           ` : ''}
+          ${isExpanded ? (() => {
+            const source = this._config.sources?.[alert._sourceIdx];
+            const detailAttr = source?.detail_attribute || 'formatted_content';
+            const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+            if (detailContent) {
+              return `<ha-markdown class="alert-formatted-content" .content=${JSON.stringify(String(detailContent))}></ha-markdown>`;
+            }
+            return '';
+          })() : ''}
         </div>
         <div class="alert-actions">
           ${this._config.show_dismiss ? `
@@ -880,6 +889,22 @@ class HaAlertCard extends HTMLElement {
         font-size: 12px;
         line-height: 1.4;
         color: var(--primary-text-color);
+      }
+
+      .alert-formatted-content {
+        display: block;
+        margin-top: 8px;
+        padding: 8px;
+        background: var(--secondary-background-color, rgba(0,0,0,0.03));
+        border-radius: 4px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--primary-text-color);
+        overflow-wrap: break-word;
+      }
+
+      .alert-formatted-content * {
+        max-width: 100%;
       }
 
       .alert-actions {
@@ -1294,6 +1319,20 @@ class HaAlertCardEditor extends HTMLElement {
               data-field="attribute"
               value="${source.attribute || ''}"
               placeholder="alerts"
+            />
+          </div>
+        </div>
+        <div class="row">
+          <label class="source-field-label">Detail attribute</label>
+          <div class="source-field-value">
+            <input
+              type="text"
+              class="source-field-input"
+              data-idx="${idx}"
+              data-field="detail_attribute"
+              value="${source.detail_attribute || ''}"
+              placeholder="formatted_content"
+              title="Entity attribute to render as markdown when an alert is expanded. Defaults to 'formatted_content' if present."
             />
           </div>
         </div>
