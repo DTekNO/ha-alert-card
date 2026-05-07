@@ -7,7 +7,7 @@
  * Version: 0.1.0
  */
 
-const CARD_VERSION = '0.2.1';
+const CARD_VERSION = '0.2.2';
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
@@ -118,6 +118,7 @@ class HaAlertCard extends HTMLElement {
       show_source_badge: config.show_source_badge !== false,
       show_area: config.show_area !== false,
       show_time: config.show_time !== false,
+      hide_when_empty: config.hide_when_empty || false,
       sort_by: config.sort_by || 'severity',
       tap_action: config.tap_action || {},
       hold_action: config.hold_action || {},
@@ -502,6 +503,13 @@ class HaAlertCard extends HTMLElement {
 
     const alertCount = this._alerts.length;
     const dismissedCount = this._dismissedAlerts.length;
+
+    // Hide the entire card when empty if configured.
+    if (this._config.hide_when_empty && alertCount === 0 && dismissedCount === 0) {
+      this.style.display = 'none';
+      return;
+    }
+    this.style.display = '';
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -1054,6 +1062,10 @@ class HaAlertCardEditor extends HTMLElement {
                 <ha-switch id="show-area"></ha-switch>
                 <span>Show area</span>
               </label>
+              <label class="switch-row">
+                <ha-switch id="hide-when-empty"></ha-switch>
+                <span>Hide card when no alerts</span>
+              </label>
             </div>
           </div>
         </ha-expansion-panel>
@@ -1163,6 +1175,8 @@ class HaAlertCardEditor extends HTMLElement {
     if (showTime) showTime.checked = config.show_time !== false;
     const showArea = root.getElementById('show-area');
     if (showArea) showArea.checked = config.show_area !== false;
+    const hideWhenEmpty = root.getElementById('hide-when-empty');
+    if (hideWhenEmpty) hideWhenEmpty.checked = !!config.hide_when_empty;
 
     // Values for source fields and mapping inputs are set via the value attribute in innerHTML
   }
@@ -1354,6 +1368,9 @@ class HaAlertCardEditor extends HTMLElement {
     });
     root.getElementById('show-area')?.addEventListener('change', (e) => {
       this._updateConfig('show_area', e.target.checked);
+    });
+    root.getElementById('hide-when-empty')?.addEventListener('change', (e) => {
+      this._updateConfig('hide_when_empty', e.target.checked);
     });
 
     // Tap action

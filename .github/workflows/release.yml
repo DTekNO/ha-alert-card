@@ -1,0 +1,27 @@
+name: Release
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Inject version into JS
+        run: |
+          sed -i "s/const CARD_VERSION = '[^']*'/const CARD_VERSION = '${{ steps.get_version.outputs.VERSION }}'/" ha-alert-card.js
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ha-alert-card.js

@@ -1,6 +1,6 @@
 {
   "name": "ha-alert-card",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "A Home Assistant Lovelace card that displays alerts from any entity with CAP-standard attributes",
   "main": "ha-alert-card.js",
   "scripts": {
