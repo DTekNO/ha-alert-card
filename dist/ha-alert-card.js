@@ -135,7 +135,7 @@ class HaAlertCard extends HTMLElement {
       hide_when_no_alerts: config.hide_when_no_alerts || false,
       hide_when_all_dismissed: config.hide_when_all_dismissed || false,
       sort_by: config.sort_by || 'severity',
-      tap_action: config.tap_action || {},
+      tap_action: config.tap_action || { action: 'none' },
       hold_action: config.hold_action || {},
       dismiss_key: config.dismiss_key || this._deriveDismissKey(config.sources),
       ...config,
