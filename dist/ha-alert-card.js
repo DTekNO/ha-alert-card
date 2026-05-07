@@ -465,6 +465,8 @@ class HaAlertCard extends HTMLElement {
         break;
       }
       case 'none':
+        // 'none' suppresses navigation but still allows expand/collapse
+        this._toggleExpand(alert._id);
         break;
       case 'default':
       default:
@@ -585,6 +587,17 @@ class HaAlertCard extends HTMLElement {
     });
     this.shadowRoot.getElementById('restoreAll')?.addEventListener('click', () => this._restoreAll());
 
+    // Set content property on ha-markdown elements (can't be done via innerHTML attribute)
+    this.shadowRoot.querySelectorAll('ha-markdown[data-content]').forEach((el) => {
+      const alertId = el.dataset.content;
+      const alert = this._alerts.find(a => a._id === alertId);
+      if (!alert) return;
+      const source = this._config.sources?.[alert._sourceIdx];
+      const detailAttr = source?.detail_attribute || 'formatted_content';
+      const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+      if (detailContent) el.content = String(detailContent);
+    });
+
     this.shadowRoot.querySelectorAll('.alert-item').forEach((el) => {
       const alertId = el.dataset.alertId;
       const alert = this._alerts.find(a => a._id === alertId);
@@ -674,7 +687,7 @@ class HaAlertCard extends HTMLElement {
             const detailAttr = source?.detail_attribute || 'formatted_content';
             const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
             if (detailContent) {
-              return `<ha-markdown class="alert-formatted-content" .content=${JSON.stringify(String(detailContent))}></ha-markdown>`;
+              return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
             }
             return '';
           })() : ''}
