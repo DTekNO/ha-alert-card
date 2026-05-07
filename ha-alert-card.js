@@ -68,6 +68,7 @@ class HaAlertCard extends HTMLElement {
     this._showDismissed = false;
     this._config = {};
     this._hass = null;
+    this._dismissedLoaded = false;
   }
 
   static get properties() {
@@ -86,9 +87,22 @@ class HaAlertCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const firstHass = !this._hass;
     this._hass = hass;
-    this._updateAlerts();
-    this._render();
+    if (firstHass && this._config.dismiss_key) {
+      // Load per-user dismissed state from HA on first hass, then render.
+      this._loadDismissed().then(() => {
+        this._updateAlerts();
+        this._render();
+      });
+    } else if (this._dismissedLoaded) {
+      // On subsequent hass updates, re-sync dismissed state from server
+      // so dismissals on other devices propagate here automatically.
+      this._syncDismissed().then(() => {
+        this._updateAlerts();
+        this._render();
+      });
+    }
   }
 
   setConfig(config) {
@@ -110,10 +124,12 @@ class HaAlertCard extends HTMLElement {
       dismiss_key: config.dismiss_key || this._deriveDismissKey(config.sources),
       ...config,
     };
-    this._loadDismissed();
     if (this._hass) {
-      this._updateAlerts();
-      this._render();
+      // Re-config while running — reload dismissed state then re-render.
+      this._loadDismissed().then(() => {
+        this._updateAlerts();
+        this._render();
+      });
     }
   }
 
@@ -147,19 +163,58 @@ class HaAlertCard extends HTMLElement {
     return `ha-alert-card-${(hash >>> 0).toString(36)}`;
   }
 
-  _loadDismissed() {
+  async _syncDismissed() {
+    // Re-fetch server state and update local if it differs.
+    // Allows dismissals on other devices to propagate to this one.
+    if (!this._hass) return;
     try {
-      const stored = localStorage.getItem(this._config.dismiss_key);
-      this._dismissed = stored ? new Set(JSON.parse(stored)) : new Set();
+      const result = await this._hass.callWS({
+        type: 'frontend/get_user_data',
+        key: this._config.dismiss_key,
+      });
+      const serverIds = result?.value ?? [];
+      const serverSet = new Set(serverIds);
+      // Only update if server state differs from local to avoid thrashing.
+      const localIds = [...this._dismissed];
+      const changed = serverSet.size !== this._dismissed.size ||
+        serverIds.some(id => !this._dismissed.has(id)) ||
+        localIds.some(id => !serverSet.has(id));
+      if (changed) this._dismissed = serverSet;
+    } catch { /* ignore sync errors */ }
+  }
+
+  async _loadDismissed() {
+    if (!this._hass) return;
+    try {
+      const result = await this._hass.callWS({
+        type: 'frontend/get_user_data',
+        key: this._config.dismiss_key,
+      });
+      if (result?.value) {
+        this._dismissed = new Set(result.value);
+      } else {
+        // Migrate from localStorage on first use.
+        const legacy = localStorage.getItem(this._config.dismiss_key);
+        this._dismissed = legacy ? new Set(JSON.parse(legacy)) : new Set();
+        if (legacy) {
+          // Save migrated state to HA and remove legacy entry.
+          await this._saveDismissed();
+          localStorage.removeItem(this._config.dismiss_key);
+        }
+      }
     } catch {
       this._dismissed = new Set();
     }
+    this._dismissedLoaded = true;
   }
 
   _saveDismissed() {
-    try {
-      localStorage.setItem(this._config.dismiss_key, JSON.stringify([...this._dismissed]));
-    } catch { /* quota exceeded, ignore */ }
+    if (!this._hass) return Promise.resolve();
+    return this._hass.callWS({
+      type: 'frontend/set_user_data',
+      key: this._config.dismiss_key,
+      value: [...this._dismissed],
+    }).catch(() => {});
   }
 
   _updateAlerts() {
