@@ -19,9 +19,9 @@ jobs:
 
       - name: Inject version into JS
         run: |
-          sed -i "s/const CARD_VERSION = '[^']*'/const CARD_VERSION = '${{ steps.get_version.outputs.VERSION }}'/" ha-alert-card.js
+          sed -i "s/const CARD_VERSION = '[^']*'/const CARD_VERSION = '${{ steps.get_version.outputs.VERSION }}'/" dist/ha-alert-card.js
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ha-alert-card.js
+          files: dist/ha-alert-card.js
