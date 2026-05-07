@@ -293,8 +293,8 @@ class HaAlertCard extends HTMLElement {
           }
         }
 
-        const alertId = this._resolveField(item, mapping.id) ||
-                        this._hashAlert(item, mapping);
+        const alertId = String(this._resolveField(item, mapping.id) ||
+                        this._hashAlert(item, mapping));
 
         seenIds.add(alertId);
 
