@@ -69,6 +69,8 @@ class HaAlertCard extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._dismissedLoaded = false;
+    this._lastSyncTime = 0;     // timestamp of last _syncDismissed call
+    this._lastEntityStates = null; // fingerprint of last seen entity states
   }
 
   static get properties() {
@@ -96,9 +98,18 @@ class HaAlertCard extends HTMLElement {
         this._render();
       });
     } else if (this._dismissedLoaded) {
-      // On subsequent hass updates, re-sync dismissed state from server
-      // so dismissals on other devices propagate here automatically.
-      this._syncDismissed().then(() => {
+      // Only re-render if entity state data actually changed.
+      const stateFingerprint = this._getEntityFingerprint(hass);
+      if (stateFingerprint === this._lastEntityStates) return;
+      this._lastEntityStates = stateFingerprint;
+
+      // Throttle cross-device dismissed sync to once per 30 seconds.
+      const now = Date.now();
+      const syncPromise = (now - this._lastSyncTime > 30000)
+        ? (this._lastSyncTime = now, this._syncDismissed())
+        : Promise.resolve();
+
+      syncPromise.then(() => {
         this._updateAlerts();
         this._render();
       });
@@ -153,6 +164,15 @@ class HaAlertCard extends HTMLElement {
   }
 
   // --- Data Layer ---
+
+  _getEntityFingerprint(hass) {
+    // Returns a string that changes only when one of our source entities changes.
+    if (!this._config.sources) return '';
+    return this._config.sources.map(s => {
+      const state = hass.states[s.entity];
+      return state ? `${s.entity}:${state.last_updated}` : `${s.entity}:missing`;
+    }).join('|');
+  }
 
   _deriveDismissKey(sources) {
     // Stable key derived from sorted entity IDs — unique per card config,
