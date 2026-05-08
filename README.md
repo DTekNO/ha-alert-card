@@ -8,7 +8,7 @@ A Home Assistant Lovelace card that displays alerts from **any entity** with str
 - **CAP defaults** — zero-config for CAP-compliant entities (event, description, severity, etc.)
 - **Custom mapping** — override field names for non-CAP entities
 - **Multiple sources** — combine alerts from different integrations in one card
-- **Dismiss** — per-alert dismiss via `localStorage` (persists per browser)
+- **Dismiss** — per-alert dismiss, stored server-side per HA user (syncs across devices)
 - **Expandable** — click to expand full description + instruction
 - **Severity coloring** — color bar by severity level, fully configurable
 - **Tap action** — click alert to navigate to URL or show more-info
@@ -188,6 +188,8 @@ Unrecognized values get neutral gray. Add custom colors via `severity_colors`.
 
 Uses the USGS public GeoJSON feed via HA's built-in REST integration. No account or API key required.
 
+![USGS Earthquake Feed example](images/example-earthquake.png)
+
 **`configuration.yaml`:**
 ```yaml
 rest:
@@ -216,7 +218,7 @@ sources:
       time: properties.time
 grid_options:
   columns: full
-  rows: 8
+  rows: auto
 ```
 
 Notes:
@@ -225,6 +227,8 @@ Notes:
 - Consider filtering by area if you want to reduce the payload, e.g. `?minmagnitude=4.5` appended to the resource URL.
 
 ### US National Weather Service Alerts
+
+![NWS Weather Alerts example](images/example-nws.png)
 
 ```yaml
 rest:
@@ -239,12 +243,12 @@ rest:
           - features
 ```
 
+Add to `configuration.yaml` (or your REST sensor config file). Replace `CA` with your state code.
+
 ```yaml
 type: custom:ha-alert-card
-title: US Weather Alerts
 sources:
   - entity: sensor.nws_active_alerts
-    name: NWS
     attribute: features
     mapping:
       title: properties.event
@@ -253,6 +257,10 @@ sources:
       area: properties.areaDesc
       time: properties.onset
       id: properties.id
+title: NWS Weather Alerts
+grid_options:
+  columns: full
+  rows: auto
 ```
 
 Notes:
