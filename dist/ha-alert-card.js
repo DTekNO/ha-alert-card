@@ -504,6 +504,20 @@ class HaAlertCard extends HTMLElement {
       const diffMin = Math.floor(diffMs / 60000);
       const diffHrs = Math.floor(diffMs / 3600000);
 
+      // Future timestamps
+      if (diffMs < 0) {
+        const absDiffMs = -diffMs;
+        const absDiffMin = Math.floor(absDiffMs / 60000);
+        const absDiffHrs = Math.floor(absDiffMs / 3600000);
+        const absDiffDays = Math.floor(absDiffMs / 86400000);
+        if (absDiffMin < 60) return `in ${absDiffMin}m`;
+        if (absDiffHrs < 24) return `in ${absDiffHrs}h`;
+        if (absDiffDays === 1) return 'Tomorrow';
+        if (absDiffDays < 7) return `in ${absDiffDays}d`;
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }
+
+      // Past timestamps
       if (diffMin < 1) return 'Just now';
       if (diffMin < 60) return `${diffMin}m ago`;
       if (diffHrs < 24) return `${diffHrs}h ago`;
