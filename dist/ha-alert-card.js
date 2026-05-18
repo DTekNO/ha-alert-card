@@ -759,14 +759,14 @@ class HaAlertCard extends HTMLElement {
         opacity: 0.8;
       }
       .card-title {
-        font-size: 16px;
+        font-size: var(--ha-font-size-l, 16px);
         font-weight: 500;
         color: var(--primary-text-color);
       }
       .badge {
         background: var(--alert-card-badge-bg);
         color: white;
-        font-size: 11px;
+        font-size: var(--ha-font-size-xs, 11px);
         font-weight: 600;
         padding: 2px 7px;
         border-radius: 10px;
@@ -780,7 +780,7 @@ class HaAlertCard extends HTMLElement {
       }
       .dismiss-all {
         color: var(--secondary-text-color);
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         cursor: pointer;
         padding: 4px 8px;
         border-radius: 4px;
@@ -795,7 +795,7 @@ class HaAlertCard extends HTMLElement {
         align-items: center;
         gap: 4px;
         color: var(--secondary-text-color);
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         cursor: pointer;
         padding: 4px 8px;
         border-radius: 4px;
@@ -862,7 +862,7 @@ class HaAlertCard extends HTMLElement {
       }
 
       .alert-source {
-        font-size: 10px;
+        font-size: var(--ha-font-size-xs, 10px);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -874,12 +874,12 @@ class HaAlertCard extends HTMLElement {
       }
 
       .alert-area {
-        font-size: 11px;
+        font-size: var(--ha-font-size-xs, 11px);
         color: var(--secondary-text-color);
       }
 
       .alert-time {
-        font-size: 11px;
+        font-size: var(--ha-font-size-xs, 11px);
         color: var(--secondary-text-color);
         margin-left: auto;
         white-space: nowrap;
@@ -887,7 +887,7 @@ class HaAlertCard extends HTMLElement {
 
       .alert-title {
         color: var(--primary-text-color);
-        font-size: 14px;
+        font-size: var(--ha-font-size-m, 14px);
         font-weight: 500;
         line-height: 1.3;
         margin-bottom: 3px;
@@ -895,7 +895,7 @@ class HaAlertCard extends HTMLElement {
 
       .alert-message {
         color: var(--secondary-text-color);
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         line-height: 1.4;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -913,7 +913,7 @@ class HaAlertCard extends HTMLElement {
         padding: 8px;
         background: var(--secondary-background-color, rgba(0,0,0,0.03));
         border-radius: 4px;
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         line-height: 1.4;
         color: var(--primary-text-color);
       }
@@ -924,7 +924,7 @@ class HaAlertCard extends HTMLElement {
         padding: 8px;
         background: var(--secondary-background-color, rgba(0,0,0,0.03));
         border-radius: 4px;
-        font-size: 13px;
+        font-size: var(--ha-font-size-s, 12px);
         line-height: 1.5;
         color: var(--primary-text-color);
         overflow-wrap: break-word;
@@ -995,7 +995,7 @@ class HaAlertCard extends HTMLElement {
         align-items: center;
         justify-content: space-between;
         padding: 8px 16px;
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         color: var(--secondary-text-color);
         font-weight: 500;
       }
@@ -1023,7 +1023,7 @@ class HaAlertCard extends HTMLElement {
         text-decoration: line-through;
       }
       .dismissed-item .alert-message {
-        font-size: 12px;
+        font-size: var(--ha-font-size-s, 12px);
         color: var(--secondary-text-color);
         white-space: nowrap;
         overflow: hidden;
@@ -1719,7 +1719,7 @@ class HaAlertCardEditor extends HTMLElement {
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 14px;
+        font-size: var(--ha-font-size-m, 14px);
         font-weight: 500;
       }
       .panel-header ha-icon {
@@ -1729,7 +1729,7 @@ class HaAlertCardEditor extends HTMLElement {
       .panel-badge {
         background: var(--primary-color, #03a9f4);
         color: white;
-        font-size: 11px;
+        font-size: var(--ha-font-size-xs, 11px);
         font-weight: 600;
         padding: 1px 6px;
         border-radius: 8px;
