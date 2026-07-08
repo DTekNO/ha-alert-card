@@ -132,6 +132,7 @@ class HaAlertCard extends HTMLElement {
       show_source_badge: config.show_source_badge !== false,
       show_area: config.show_area !== false,
       show_time: config.show_time !== false,
+      show_image: config.show_image !== false,
       hide_when_no_alerts: config.hide_when_no_alerts || false,
       hide_when_all_dismissed: config.hide_when_all_dismissed || false,
       sort_by: config.sort_by || 'severity',
@@ -608,9 +609,8 @@ class HaAlertCard extends HTMLElement {
       if (!alert) return;
       const source = this._config.sources?.[alert._sourceIdx];
       const detailAttr = source?.detail_attribute || 'formatted_content';
-      const entityAlertCount = this._alerts.filter(a => a._entity === alert._entity).length;
       const detailContent = alert._raw?.[detailAttr]
-        ?? (entityAlertCount === 1 ? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr] : null);
+        ?? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
       if (detailContent) el.content = String(detailContent);
     });
 
@@ -681,12 +681,18 @@ class HaAlertCard extends HTMLElement {
     const isExpanded = this._expanded.has(alert._id);
     const color = this._getSeverityColor(alert.severity);
     const timeStr = this._formatTime(alert.time);
+    const source = this._config.sources?.[alert._sourceIdx];
+    const imageAttr = source?.image_attribute;
+    const imageUrl = imageAttr
+      ? (alert._raw?.[imageAttr] ?? this._hass?.states?.[alert._entity]?.attributes?.[imageAttr])
+      : null;
 
     return `
       <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${alert._id}">
         <div class="severity-bar" style="background: ${color}"></div>
         <div class="alert-content">
           <div class="alert-top-row">
+            ${this._config.show_image && imageUrl ? `<img class="alert-image" src="${imageUrl}" alt="" />` : ''}
             ${this._config.show_source_badge ? `<span class="alert-source">${alert._source}</span>` : ''}
             ${this._config.show_area && alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
             ${this._config.show_time && timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
@@ -701,9 +707,8 @@ class HaAlertCard extends HTMLElement {
           ${isExpanded ? (() => {
             const source = this._config.sources?.[alert._sourceIdx];
             const detailAttr = source?.detail_attribute || 'formatted_content';
-            const entityAlertCount = this._alerts.filter(a => a._entity === alert._entity).length;
             const detailContent = alert._raw?.[detailAttr]
-              ?? (entityAlertCount === 1 ? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr] : null);
+              ?? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
             if (detailContent) {
               return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
             }
@@ -863,6 +868,13 @@ class HaAlertCard extends HTMLElement {
         gap: 8px;
         margin-bottom: 4px;
         flex-wrap: wrap;
+      }
+
+      .alert-image {
+        height: 32px;
+        width: auto;
+        flex-shrink: 0;
+        vertical-align: middle;
       }
 
       .alert-source {
@@ -1148,6 +1160,10 @@ class HaAlertCardEditor extends HTMLElement {
                 <span>Show source badges</span>
               </label>
               <label class="switch-row">
+                <ha-switch id="show-image"></ha-switch>
+                <span>Show images (requires Image attribute per source)</span>
+              </label>
+              <label class="switch-row">
                 <ha-switch id="show-time"></ha-switch>
                 <span>Show time</span>
               </label>
@@ -1272,6 +1288,8 @@ class HaAlertCardEditor extends HTMLElement {
     if (showTime) showTime.checked = config.show_time !== false;
     const showArea = root.getElementById('show-area');
     if (showArea) showArea.checked = config.show_area !== false;
+    const showImage = root.getElementById('show-image');
+    if (showImage) showImage.checked = config.show_image !== false;
     const hideWhenNoAlerts = root.getElementById('hide-when-no-alerts');
     if (hideWhenNoAlerts) hideWhenNoAlerts.checked = !!config.hide_when_no_alerts;
     const hideWhenAllDismissed = root.getElementById('hide-when-all-dismissed');
@@ -1372,6 +1390,20 @@ class HaAlertCardEditor extends HTMLElement {
               value="${source.detail_attribute || ''}"
               placeholder="formatted_content"
               title="Entity attribute to render as markdown when an alert is expanded. Defaults to 'formatted_content' if present."
+            />
+          </div>
+        </div>
+        <div class="row">
+          <label class="source-field-label">Image attribute</label>
+          <div class="source-field-value">
+            <input
+              type="text"
+              class="source-field-input"
+              data-idx="${idx}"
+              data-field="image_attribute"
+              value="${source.image_attribute || ''}"
+              placeholder="e.g. entity_picture, travel_tag"
+              title="Attribute name for an image shown in each alert row. Checked per-alert first, then on the entity."
             />
           </div>
         </div>
@@ -1481,6 +1513,9 @@ class HaAlertCardEditor extends HTMLElement {
     });
     root.getElementById('show-area')?.addEventListener('change', (e) => {
       this._updateConfig('show_area', e.target.checked);
+    });
+    root.getElementById('show-image')?.addEventListener('change', (e) => {
+      this._updateConfig('show_image', e.target.checked);
     });
     root.getElementById('hide-when-no-alerts')?.addEventListener('change', (e) => {
       this._updateConfig('hide_when_no_alerts', e.target.checked);

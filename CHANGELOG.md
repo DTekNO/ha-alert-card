@@ -61,3 +61,13 @@ First stable release. HA Alert Card is a Lovelace card for Home Assistant that d
 **Lightweight**
 - Single plain JS file, no build step, no npm dependencies
 - HACS-compatible, released as a plugin
+
+### Changed
+- License changed from MIT to AGPL-3.0
+
+### Fixed
+- Editor expansion panels (Appearance, Interactions) no longer collapse when a setting is changed
+- Expanding one alert no longer shows all alerts' detail content — each expanded alert now shows only its own formatted content
+
+### Added
+- `image_attribute` per-source config: shows a small image (e.g. `entity_picture` or `travel_tag`) in each alert row. Per-alert value is used when available, with fallback to the entity attribute
