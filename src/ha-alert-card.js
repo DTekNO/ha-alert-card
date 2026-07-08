@@ -608,7 +608,9 @@ class HaAlertCard extends HTMLElement {
       if (!alert) return;
       const source = this._config.sources?.[alert._sourceIdx];
       const detailAttr = source?.detail_attribute || 'formatted_content';
-      const detailContent = alert._raw?.[detailAttr];
+      const entityAlertCount = this._alerts.filter(a => a._entity === alert._entity).length;
+      const detailContent = alert._raw?.[detailAttr]
+        ?? (entityAlertCount === 1 ? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr] : null);
       if (detailContent) el.content = String(detailContent);
     });
 
@@ -699,7 +701,9 @@ class HaAlertCard extends HTMLElement {
           ${isExpanded ? (() => {
             const source = this._config.sources?.[alert._sourceIdx];
             const detailAttr = source?.detail_attribute || 'formatted_content';
-            const detailContent = alert._raw?.[detailAttr];
+            const entityAlertCount = this._alerts.filter(a => a._entity === alert._entity).length;
+            const detailContent = alert._raw?.[detailAttr]
+              ?? (entityAlertCount === 1 ? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr] : null);
             if (detailContent) {
               return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
             }
@@ -1055,6 +1059,7 @@ class HaAlertCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._expandedSources = new Set();
+    this._expandedPanels = new Set(['sources']); // sources starts expanded
     this._debug = true; // Enable debug logging
   }
 
@@ -1085,12 +1090,19 @@ class HaAlertCardEditor extends HTMLElement {
     const tapAction = config.tap_action || {};
     const holdAction = config.hold_action || {};
 
+    // Save expanded state of named panels before replacing DOM.
+    this.shadowRoot.querySelectorAll('ha-expansion-panel[data-panel-id]').forEach(el => {
+      const id = el.dataset.panelId;
+      if (el.expanded) this._expandedPanels.add(id);
+      else this._expandedPanels.delete(id);
+    });
+
     this.shadowRoot.innerHTML = `
       <style>${this._getEditorStyles()}</style>
       <div class="editor">
 
         <!-- Appearance -->
-        <ha-expansion-panel outlined>
+        <ha-expansion-panel outlined data-panel-id="appearance" ${this._expandedPanels.has('appearance') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:palette-outline"></ha-icon>
             <span>Appearance</span>
@@ -1156,7 +1168,7 @@ class HaAlertCardEditor extends HTMLElement {
         </ha-expansion-panel>
 
         <!-- Sources -->
-        <ha-expansion-panel outlined expanded>
+        <ha-expansion-panel outlined data-panel-id="sources" ${this._expandedPanels.has('sources') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:database-outline"></ha-icon>
             <span>Sources</span>
@@ -1174,7 +1186,7 @@ class HaAlertCardEditor extends HTMLElement {
         </ha-expansion-panel>
 
         <!-- Interactions -->
-        <ha-expansion-panel outlined>
+        <ha-expansion-panel outlined data-panel-id="interactions" ${this._expandedPanels.has('interactions') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:gesture-tap"></ha-icon>
             <span>Interactions</span>
