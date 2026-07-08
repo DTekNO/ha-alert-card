@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0] — upcoming
+## [2026.7.1] — 2026-07-08
 
 ### Overview
 
