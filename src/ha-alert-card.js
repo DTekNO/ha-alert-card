@@ -608,7 +608,7 @@ class HaAlertCard extends HTMLElement {
       if (!alert) return;
       const source = this._config.sources?.[alert._sourceIdx];
       const detailAttr = source?.detail_attribute || 'formatted_content';
-      const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+      const detailContent = alert._raw?.[detailAttr];
       if (detailContent) el.content = String(detailContent);
     });
 
@@ -699,7 +699,7 @@ class HaAlertCard extends HTMLElement {
           ${isExpanded ? (() => {
             const source = this._config.sources?.[alert._sourceIdx];
             const detailAttr = source?.detail_attribute || 'formatted_content';
-            const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+            const detailContent = alert._raw?.[detailAttr];
             if (detailContent) {
               return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
             }
