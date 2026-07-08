@@ -71,3 +71,4 @@ First stable release. HA Alert Card is a Lovelace card for Home Assistant that d
 
 ### Added
 - `image_attribute` per-source config: shows a small image (e.g. `entity_picture` or `travel_tag`) in each alert row. Per-alert value is used when available, with fallback to the entity attribute
+- `show_image` card-level toggle: enable/disable image display globally (default: on). Works alongside `image_attribute`

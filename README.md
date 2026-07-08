@@ -9,7 +9,8 @@ A Home Assistant Lovelace card that displays alerts from **any entity** with str
 - **Custom mapping** — override field names for non-CAP entities
 - **Multiple sources** — combine alerts from different integrations in one card
 - **Dismiss** — per-alert dismiss, stored server-side per HA user (syncs across devices)
-- **Expandable** — click to expand full description + instruction
+- **Expandable** — click to expand per-alert detail using the `formatted_content` field on each alert item; falls back to entity-level attribute
+- **Per-alert images** — show a badge or icon inline in each alert row via `image_attribute` (e.g. Entur TravelTag or Norway Alerts warning icons)
 - **Severity coloring** — color bar by severity level, fully configurable
 - **Tap action** — click alert to navigate to URL or show more-info
 - **Sortable** — by severity (default) or time
@@ -66,14 +67,16 @@ This automatically reads from the `alerts` attribute and maps:
 type: custom:ha-alert-card
 title: Alerts & Disruptions
 sources:
-  # Norway Alerts — uses CAP defaults, just specify entity
+  # Norway Alerts — CAP-native, zero mapping needed; per-alert icon in each row
   - entity: sensor.norway_alerts_vestland
     name: Met.no
+    image_attribute: entity_picture
 
-  # Entur transport — needs mapping since field names differ
-  - entity: sensor.entur_sx_summary
-    name: Transport
-    attribute: new_disruptions
+  # Entur SX — per-line sensor, TravelTag badge shown in each row
+  - entity: sensor.skyss_disruption_sky_line_1021
+    name: Skyss
+    attribute: all_deviations
+    image_attribute: travel_tag
     mapping:
       title: summary
       message: description
@@ -104,6 +107,7 @@ show_dismiss: true               # Show dismiss buttons
 show_source_badge: true          # Show source label per alert
 show_area: true                  # Show area/location
 show_time: true                  # Show relative time
+show_image: true                 # Show per-alert images (requires image_attribute on source)
 sort_by: severity                # 'severity' or 'time'
 dismiss_key: ha-alert-card-dismissed  # localStorage key (change if using multiple cards)
 tap_action:
@@ -122,6 +126,8 @@ sources:
   - entity: sensor.norway_alerts_vestland
     name: Weather                # Display name in source badge
     attribute: alerts            # Attribute containing the list (default: 'alerts')
+    image_attribute: entity_picture  # Per-alert image: checked on each item first, then entity
+    detail_attribute: formatted_content  # Attribute rendered as markdown when alert is expanded
     mapping:                     # Field mapping (all optional if using CAP names)
       title: event
       message: description
@@ -140,6 +146,8 @@ sources:
 | `entity` | string | **required** | Entity ID |
 | `name` | string | entity name | Source badge label |
 | `attribute` | string | `alerts` | Attribute containing the alert array |
+| `detail_attribute` | string | `formatted_content` | Attribute rendered as markdown when an alert is expanded. Checked on the per-alert item first (`alert._raw`), then falls back to the entity attribute. |
+| `image_attribute` | string | — | Attribute name for an image shown in each alert row (32px high). Checked on the per-alert item first, then falls back to the entity attribute. Used with `show_image: true`. |
 | `mapping` | object | CAP defaults | Field name mapping (see below) |
 
 ### Mapping fields
@@ -287,4 +295,4 @@ Should work with any integration that stores structured alerts in entity attribu
 
 ## License
 
-MIT
+AGPL-3.0
