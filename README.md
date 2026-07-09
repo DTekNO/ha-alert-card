@@ -255,9 +255,11 @@ Add to `configuration.yaml` (or your REST sensor config file). Replace `CA` with
 
 ```yaml
 type: custom:ha-alert-card
+title: NWS Weather Alerts
 sources:
   - entity: sensor.nws_active_alerts
     attribute: features
+    detail_attribute: properties.description
     mapping:
       title: properties.event
       message: properties.headline
@@ -265,7 +267,7 @@ sources:
       area: properties.areaDesc
       time: properties.onset
       id: properties.id
-title: NWS Weather Alerts
+      instruction: properties.instruction
 grid_options:
   columns: full
   rows: auto
@@ -275,6 +277,7 @@ Notes:
 - The `User-Agent` header is required by the NWS API.
 - Filter by state with `?area=CA`, `?area=TX`, etc. Without a filter the full US feed can be very large.
 - `properties.severity` values are CAP-standard (`Extreme`/`Severe`/`Moderate`/`Minor`) and map directly to the card's built-in color scheme.
+- `detail_attribute: properties.description` shows the full description (with `* bullet` formatting) when an alert is expanded. The `instruction` mapping surfaces safety instructions below the description.
 
 ## Compatibility
 
