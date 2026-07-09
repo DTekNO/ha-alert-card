@@ -2,6 +2,8 @@
 
 A Home Assistant Lovelace card that displays alerts from **any entity** with structured alert data in attributes. Uses [CAP (Common Alerting Protocol)](https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2.html) field names as defaults — entities that already follow CAP work with zero field mapping.
 
+![HA Alert Card demo — Entur SX, USGS earthquakes, and NWS weather alerts](images/Animation.gif)
+
 ## Features
 
 - **Universal** — works with any entity that stores alerts as a list in an attribute
