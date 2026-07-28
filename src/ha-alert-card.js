@@ -7,7 +7,7 @@
  * Version: 0.1.0
  */
 
-const CARD_VERSION = '0.2.5';
+const CARD_VERSION = '2026.7.2';
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
@@ -88,8 +88,32 @@ class HaAlertCard extends HTMLElement {
     };
   }
 
+  connectedCallback() {
+    // Re-render when the URL changes (e.g. ?edit=1 added/removed).
+    // HA fires 'location-changed' on every navigation; popstate covers
+    // the browser back/forward case.
+    // Defer by one animation frame so the URL is fully updated before
+    // we check window.location.search.
+    this._onLocationChanged = () => {
+      requestAnimationFrame(() => {
+        if (this._hass) {
+          this._updateAlerts();
+          this._render();
+        }
+      });
+    };
+    window.addEventListener('location-changed', this._onLocationChanged);
+    window.addEventListener('popstate', this._onLocationChanged);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('location-changed', this._onLocationChanged);
+    window.removeEventListener('popstate', this._onLocationChanged);
+  }
+
   set hass(hass) {
     const firstHass = !this._hass;
+    const editModeChanged = this._hass?.editMode !== hass?.editMode;
     this._hass = hass;
     if (firstHass && this._config.dismiss_key) {
       // Load per-user dismissed state from HA on first hass, then render.
@@ -111,7 +135,7 @@ class HaAlertCard extends HTMLElement {
       const syncPromise = shouldSync ? this._syncDismissed() : Promise.resolve(false);
 
       syncPromise.then((dismissedChanged) => {
-        if (entitiesChanged || dismissedChanged) {
+        if (entitiesChanged || dismissedChanged || editModeChanged) {
           this._updateAlerts();
           this._render();
         }
@@ -302,10 +326,10 @@ class HaAlertCard extends HTMLElement {
         const alertObj = {
           _id: alertId,
           _sourceIdx: this._config.sources.indexOf(source),
-          _source: source.name || source.entity.split('.').pop(),
+          _source: source.name || entity.attributes.friendly_name || source.entity.split('.').pop(),
           _entity: source.entity,
           _raw: item,
-          title: this._resolveField(item, mapping.title) || 'Alert',
+          title: this._resolveField(item, mapping.title) || entity.attributes.friendly_name || 'Alert',
           message: this._resolveField(item, mapping.message) || '',
           severity: (this._resolveField(item, mapping.severity) || 'unknown').toLowerCase(),
           time: this._resolveField(item, mapping.time) || '',
@@ -546,16 +570,23 @@ class HaAlertCard extends HTMLElement {
     const dismissedCount = this._dismissedAlerts.length;
 
     // Hide card based on visibility toggles.
+    // Always show the card in edit mode so it can be grabbed and configured.
+    // HA appends ?edit=1 to the URL in edit mode — most reliable signal.
+    const inEditMode = !!this._hass?.editMode
+                    || new URLSearchParams(window.location.search).get('edit') === '1'
+                    || !!this.closest('hui-card-options');
     const totalAlerts = alertCount + dismissedCount;
-    if (this._config.hide_when_no_alerts && totalAlerts === 0) {
+    if (!inEditMode && this._config.hide_when_no_alerts && totalAlerts === 0) {
       this.style.display = 'none';
       return;
     }
-    if (this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0) {
+    if (!inEditMode && this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0) {
       this.style.display = 'none';
       return;
     }
     this.style.display = '';
+
+    const showDismissed = this._showDismissed || inEditMode;
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -568,8 +599,8 @@ class HaAlertCard extends HTMLElement {
           </div>
           <div class="card-header-right">
             ${dismissedCount > 0 ? `
-              <span class="toggle-dismissed" id="toggleDismissed" title="${this._showDismissed ? 'Hide' : 'Show'} dismissed">
-                <ha-icon icon="mdi:${this._showDismissed ? 'eye-off' : 'eye'}"></ha-icon>
+              <span class="toggle-dismissed" id="toggleDismissed" title="${showDismissed ? 'Hide' : 'Show'} dismissed">
+                <ha-icon icon="mdi:${showDismissed ? 'eye-off' : 'eye'}"></ha-icon>
                 <span>${dismissedCount}</span>
               </span>
             ` : ''}
@@ -579,9 +610,9 @@ class HaAlertCard extends HTMLElement {
           </div>
         </div>
         <div class="alert-list">
-          ${alertCount === 0 && (!this._showDismissed || dismissedCount === 0) ? this._renderEmpty() : ''}
+          ${alertCount === 0 && (!showDismissed || dismissedCount === 0) ? this._renderEmpty() : ''}
           ${this._alerts.map(a => this._renderAlert(a)).join('')}
-          ${this._showDismissed && dismissedCount > 0 ? `
+          ${showDismissed && dismissedCount > 0 ? `
             <div class="dismissed-section">
               <div class="dismissed-header">
                 <span>Dismissed (${dismissedCount})</span>
@@ -1588,7 +1619,8 @@ class HaAlertCardEditor extends HTMLElement {
         e.stopPropagation();
         const idx = parseInt(e.currentTarget.dataset.idx, 10);
         if (isNaN(idx)) return;
-        this._config.sources.splice(idx, 1);
+        const sources = this._config.sources.filter((_, i) => i !== idx);
+        this._config = { ...this._config, sources };
         this._expandedSources.delete(idx);
         this._fireChanged();
         this._render();
