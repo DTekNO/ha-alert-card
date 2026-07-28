@@ -113,7 +113,9 @@ class HaAlertCard extends HTMLElement {
 
   set hass(hass) {
     const firstHass = !this._hass;
-    const editModeChanged = this._hass?.editMode !== hass?.editMode;
+    const nowEdit = this._inEditMode();
+    const editModeChanged = nowEdit !== this._wasEditMode;
+    this._wasEditMode = nowEdit;
     this._hass = hass;
     if (firstHass && this._config.dismiss_key) {
       // Load per-user dismissed state from HA on first hass, then render.
@@ -563,30 +565,81 @@ class HaAlertCard extends HTMLElement {
     return this._config.severity_colors[severity] || this._config.severity_colors['unknown'] || '#9e9e9e';
   }
 
+  // Detect Lovelace edit mode.  HA does NOT push a "dashboard is being edited"
+  // flag to cards (element.editMode/preview is only true in the card-editor
+  // dialog preview), and the sections view has no `hui-card-options` wrapper and
+  // no `?edit=1` URL.  The one reliable signal is the Lovelace root's editMode,
+  // so we walk up through shadow roots to find `hui-root` and read it.
+  _inEditMode() {
+    // Card-editor dialog preview (HA assigns these on the element).
+    if (this.editMode === true || this.preview === true) return true;
+    // Masonry edit wrapper.
+    try { if (this.closest('hui-card-options')) return true; } catch (e) {}
+    // Walk up (crossing shadow boundaries) to the Lovelace root.
+    let node = this;
+    for (let i = 0; i < 30 && node; i++) {
+      const parent = node.parentNode;
+      // A ShadowRoot (nodeType 11) exposes its host; otherwise step to parent.
+      node = (parent && parent.nodeType === 11) ? parent.host : parent;
+      if (node && node.lovelace && typeof node.lovelace.editMode === 'boolean') {
+        return node.lovelace.editMode;
+      }
+    }
+    return false;
+  }
+
+  _renderEditPlaceholder(reason) {
+    return `
+      <ha-card class="edit-placeholder">
+        <div class="empty-state">
+          <ha-icon icon="mdi:bell-sleep-outline"></ha-icon>
+          <div class="edit-placeholder-title">${this._config.title}</div>
+          <div class="edit-hint">Hidden here (${reason})<br>shown only while editing</div>
+        </div>
+      </ha-card>
+    `;
+  }
+
   _render() {
     if (!this.shadowRoot) return;
 
     const alertCount = this._alerts.length;
     const dismissedCount = this._dismissedAlerts.length;
 
-    // Hide card based on visibility toggles.
-    // Always show the card in edit mode so it can be grabbed and configured.
-    // HA appends ?edit=1 to the URL in edit mode — most reliable signal.
-    const inEditMode = !!this._hass?.editMode
-                    || new URLSearchParams(window.location.search).get('edit') === '1'
-                    || !!this.closest('hui-card-options');
+    // Visibility toggles.  In edit mode the card must stay visible & grabbable,
+    // so instead of hiding we render a clean placeholder (see below).
+    const inEditMode = this._inEditMode();
     const totalAlerts = alertCount + dismissedCount;
-    if (!inEditMode && this._config.hide_when_no_alerts && totalAlerts === 0) {
-      this.style.display = 'none';
-      return;
-    }
-    if (!inEditMode && this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0) {
-      this.style.display = 'none';
+    const wouldHide =
+      (this._config.hide_when_no_alerts && totalAlerts === 0) ||
+      (this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0);
+
+    if (wouldHide) {
+      if (!inEditMode) {
+        // Not editing — genuinely hide the card.
+        this.style.display = 'none';
+        return;
+      }
+      // Editing — show a tidy placeholder frame instead of the full/cluttered
+      // card, so it stays selectable without exposing the empty header or the
+      // expanded dismissed list.
+      this.style.display = '';
+      const reason = (this._config.hide_when_no_alerts && totalAlerts === 0)
+        ? 'no active alerts'
+        : 'all alerts dismissed';
+      this.shadowRoot.innerHTML = `
+        <style>${this._getStyles()}</style>
+        ${this._renderEditPlaceholder(reason)}
+      `;
       return;
     }
     this.style.display = '';
 
-    const showDismissed = this._showDismissed || inEditMode;
+    // Respect the user's dismissed toggle even while editing.  Forcing it open
+    // in edit mode expanded the whole dismissed list, which looked cluttered;
+    // the card still stays visible in edit mode via the hide-guards above, so
+    // it remains grabbable/configurable while showing the clean empty state.
+    const showDismissed = this._showDismissed;
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -1031,6 +1084,23 @@ class HaAlertCard extends HTMLElement {
         --mdc-icon-size: 40px;
         opacity: 0.3;
         margin-bottom: 8px;
+      }
+
+      /* Edit-mode placeholder (shown while editing when the card would be hidden) */
+      .edit-placeholder {
+        border: 1px dashed var(--divider-color, #9e9e9e);
+        background: transparent;
+        opacity: 0.85;
+      }
+      .edit-placeholder-title {
+        font-weight: 500;
+        color: var(--primary-text-color);
+        margin-bottom: 2px;
+      }
+      .edit-hint {
+        font-size: var(--ha-font-size-s, 12px);
+        line-height: 1.3;
+        opacity: 0.7;
       }
 
       /* Dismissed section */
