@@ -1,5 +1,12 @@
 # HA Alert Card
 
+[![hacs][hacs-badge]][hacs-url]
+[![Validate with HACS][hacs-validation-badge]][hacs-validation-url]
+[![release][release-badge]][release-url]
+![Maintenance][maintenance-badge]
+![GitHub Downloads (all assets, all releases)][downloads-total]
+![GitHub Downloads (all assets, latest release)][downloads-latest]
+
 A Home Assistant Lovelace card that displays alerts from **any entity** with structured alert data in attributes. Uses [CAP (Common Alerting Protocol)](https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2.html) field names as defaults — entities that already follow CAP work with zero field mapping.
 
 ![HA Alert Card demo — Entur SX, USGS earthquakes, and NWS weather alerts](images/Animation.gif)
@@ -301,3 +308,13 @@ Should work with any integration that stores structured alerts in entity attribu
 ## License
 
 AGPL-3.0
+
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg
+[hacs-url]: https://github.com/DTekNO/ha-alert-card
+[hacs-validation-badge]: https://github.com/DTekNO/ha-alert-card/actions/workflows/validate-with-hacs.yml/badge.svg
+[hacs-validation-url]: https://github.com/DTekNO/ha-alert-card/actions/workflows/validate-with-hacs.yml
+[maintenance-badge]: https://img.shields.io/maintenance/yes/2026.svg
+[release-badge]: https://img.shields.io/github/release/DTekNO/ha-alert-card.svg
+[release-url]: https://github.com/DTekNO/ha-alert-card/releases
+[downloads-total]: https://img.shields.io/github/downloads/DTekNO/ha-alert-card/total
+[downloads-latest]: https://img.shields.io/github/downloads/DTekNO/ha-alert-card/latest/total
