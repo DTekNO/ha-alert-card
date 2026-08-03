@@ -8,7 +8,6 @@ HA Alert Card is a Lovelace card for Home Assistant that displays alerts from **
 
 > ⚠️ **This is a security release — please update.** Alert text arriving from third-party feeds was rendered into the page without escaping, so a feed item containing markup could execute script in your Home Assistant frontend. All feed-derived text is now escaped. If you point this card at any external feed — weather services, earthquake data, transit disruptions, RSS — this fix applies to you. Nothing in your configuration needs to change.
 
-This is also the first release available through the HACS default repository, so for many users it is the first version they see.
 
 **What the card does**
 
