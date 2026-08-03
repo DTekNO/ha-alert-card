@@ -23,6 +23,7 @@ A Home Assistant Lovelace card that displays alerts from **any entity** with str
 - **Severity coloring** — color bar by severity level, fully configurable
 - **Tap action** — click alert to navigate to URL or show more-info
 - **Sortable** — by severity (default) or time
+- **Safe with untrusted feeds** — feed text is HTML-escaped and link/image URLs are scheme-restricted (see [Security](#security))
 - **Lightweight** — single JS file, no build step, no dependencies
 
 ## Installation
@@ -193,7 +194,7 @@ Unrecognized values get neutral gray. Add custom colors via `severity_colors`.
   - Internal path (`/lovelace/...`) → navigates within HA
   - External URL (`https://...`) → opens in new tab
 - **Tap (no URL)** — expands/collapses the alert to show full description and instruction
-- **Dismiss** — click × to hide an alert. Stored in `localStorage` per browser.
+- **Dismiss** — click × to hide an alert. Stored **server-side per Home Assistant user**, so dismissals follow you across browsers and devices and survive a cache clear. Existing `localStorage` dismissals are migrated automatically on first load.
 - **Show dismissed** — click the eye icon in the header to reveal dismissed alerts with restore buttons
 - **Auto-cleanup** — dismissed alerts are automatically pruned from storage when they disappear from the entity (expired, removed by integration)
 - **Sort** — by default, highest severity first. Set `sort_by: time` for newest-first.
@@ -288,6 +289,17 @@ Notes:
 - `properties.severity` values are CAP-standard (`Extreme`/`Severe`/`Moderate`/`Minor`) and map directly to the card's built-in color scheme.
 - `detail_attribute: properties.description` shows the full description (with `* bullet` formatting) when an alert is expanded. The `instruction` mapping surfaces safety instructions below the description.
 
+## Security
+
+Alerts come from third-party feeds, so the card treats every feed-supplied value as untrusted:
+
+- **Alert text is HTML-escaped** — `title`, `message`, `area`, `instruction`, the source badge and the timestamp are escaped before rendering, so markup in a feed item displays as literal text instead of executing. Ordinary punctuation (ampersands, apostrophes, quotes, dashes, accents) renders exactly as written.
+- **The expandable detail is rendered as markdown, not raw HTML** — `detail_attribute` content is handed to Home Assistant's own `ha-markdown` component, which sanitizes it. Feeds that use markdown formatting (such as the NWS bullet lists in the example below) display as intended.
+- **Image URLs are scheme-restricted** — `image_attribute` values must be `http(s)`, protocol-relative, site-relative, or `data:image/…`. Anything else renders no image.
+- **Link targets are scheme-restricted** — a feed's `url` opens externally only for `http(s)`; other values fall back to a more-info dialog rather than being followed.
+
+Escaping was added in **2026.8.1** after a report from [@frenck](https://github.com/frenck) during HACS review. If you are running an older version and consume any external feed, please update.
+
 ## Compatibility
 
 Tested with:
@@ -300,10 +312,16 @@ Should work with any integration that stores structured alerts in entity attribu
 
 ## Development
 
+Edit `src/ha-alert-card.js` and hard-refresh the browser — there is no build step and no dependencies.
+
 ```bash
-# Just edit ha-alert-card.js and hard-refresh browser
-# No build step required
+# Run the XSS regression tests (needs only node)
+node test/xss.test.js
 ```
+
+`dist/ha-alert-card.js` is a generated copy of `src/`, committed because HACS resolves a plugin file from the release asset, then `dist/`, then the repo root. It is kept in step automatically: a workflow rebuilds it on pushes that touch `src/`, and the release workflow rebuilds it again at tag time with the version injected from the tag. Never edit `dist/` or the version string by hand.
+
+`mockup.html` is a standalone browser mockup with simulated Home Assistant data, useful for iterating on layout without a running HA instance.
 
 ## License
 

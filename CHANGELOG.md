@@ -2,6 +2,26 @@
 
 ## [2026.8.1] — 2026-08-03
 
+### Overview
+
+HA Alert Card is a Lovelace card for Home Assistant that displays alerts from **any entity** with structured alert data in its attributes. It is built around the [CAP (Common Alerting Protocol)](https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2.html) field vocabulary as defaults, so CAP-compliant entities work with zero configuration; non-CAP sources are supported through a per-source field mapping.
+
+> ⚠️ **This is a security release — please update.** Alert text arriving from third-party feeds was rendered into the page without escaping, so a feed item containing markup could execute script in your Home Assistant frontend. All feed-derived text is now escaped. If you point this card at any external feed — weather services, earthquake data, transit disruptions, RSS — this fix applies to you. Nothing in your configuration needs to change.
+
+This is also the first release available through the HACS default repository, so for many users it is the first version they see.
+
+**What the card does**
+
+- **Any source** — any entity exposing a list of alerts in an attribute; CAP field names by default, per-source `mapping` for everything else, and multiple sources combined in one card
+- **Dismiss and restore** — per-alert dismiss stored server-side per HA user, so it syncs across browsers and devices; dismissed alerts reviewable and restorable from the header
+- **Severity colouring** — a colour bar keyed to severity, with built-in support for CAP, Norwegian and generic level names, fully overridable
+- **Expandable detail** — tap to expand full description and instructions, rendered as markdown
+- **Per-alert images** — inline badges or icons from the feed (Entur TravelTag, Norway Alerts warning icons)
+- **Visual editor** — full GUI configuration in the card picker, no YAML required
+- **Lightweight** — a single plain JS file, no build step, no dependencies
+
+📖 **Full configuration reference, worked examples (USGS earthquakes, US NWS alerts) and behaviour details: [README](https://github.com/DTekNO/ha-alert-card#readme).** Per-release detail for earlier versions is below.
+
 ### Security
 
 - **Alert fields from third-party feeds are now HTML-escaped before rendering** — the card interpolated `title`, `message`, `area`, `instruction`, the source badge, the formatted time and the alert id straight into `shadowRoot.innerHTML`. Because those values come from external feeds (USGS, NWS, RSS, …), a feed item whose text contained markup such as `<img src=x onerror=…>` would execute script in the Home Assistant frontend. All feed-derived values now pass through an escape helper, in both text and attribute contexts, and in both the active and dismissed alert renderers.
