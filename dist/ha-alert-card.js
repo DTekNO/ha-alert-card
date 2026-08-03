@@ -7,7 +7,38 @@
  * Version: 0.1.0
  */
 
-const CARD_VERSION = '0.2.5';
+const CARD_VERSION = '2026.7.2';
+
+// --- HTML escaping -----------------------------------------------------------
+// Alert fields come from third-party feeds (USGS, NWS, RSS, ...) and are
+// rendered into shadowRoot.innerHTML.  Every feed-derived value MUST pass
+// through escapeHtml() on its way into markup (text and attribute contexts
+// alike), so a feed item containing e.g. <img src=x onerror=...> renders as
+// inert text instead of executing in the Home Assistant frontend.
+//
+// Deliberately NOT escaped: the expandable detail (formatted_content), which
+// is assigned to <ha-markdown>.content as a property — ha-markdown renders it
+// with Home Assistant's own markdown sanitizer, preserving the intended
+// formatting (NWS bullet lists etc.) without allowing raw HTML through.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Image URLs from feeds may only use safe schemes: http(s), protocol-relative,
+// site-relative, or inline data:image.  Anything else (javascript:, etc.)
+// renders no image at all.
+function safeImageUrl(url) {
+  const s = String(url ?? '').trim();
+  if (/^(https?:)?\/\//i.test(s) || (s.startsWith('/') && !s.startsWith('//')) || /^data:image\//i.test(s)) {
+    return s;
+  }
+  return '';
+}
 
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
@@ -88,8 +119,34 @@ class HaAlertCard extends HTMLElement {
     };
   }
 
+  connectedCallback() {
+    // Re-render when the URL changes (e.g. ?edit=1 added/removed).
+    // HA fires 'location-changed' on every navigation; popstate covers
+    // the browser back/forward case.
+    // Defer by one animation frame so the URL is fully updated before
+    // we check window.location.search.
+    this._onLocationChanged = () => {
+      requestAnimationFrame(() => {
+        if (this._hass) {
+          this._updateAlerts();
+          this._render();
+        }
+      });
+    };
+    window.addEventListener('location-changed', this._onLocationChanged);
+    window.addEventListener('popstate', this._onLocationChanged);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('location-changed', this._onLocationChanged);
+    window.removeEventListener('popstate', this._onLocationChanged);
+  }
+
   set hass(hass) {
     const firstHass = !this._hass;
+    const nowEdit = this._inEditMode();
+    const editModeChanged = nowEdit !== this._wasEditMode;
+    this._wasEditMode = nowEdit;
     this._hass = hass;
     if (firstHass && this._config.dismiss_key) {
       // Load per-user dismissed state from HA on first hass, then render.
@@ -111,7 +168,7 @@ class HaAlertCard extends HTMLElement {
       const syncPromise = shouldSync ? this._syncDismissed() : Promise.resolve(false);
 
       syncPromise.then((dismissedChanged) => {
-        if (entitiesChanged || dismissedChanged) {
+        if (entitiesChanged || dismissedChanged || editModeChanged) {
           this._updateAlerts();
           this._render();
         }
@@ -132,6 +189,7 @@ class HaAlertCard extends HTMLElement {
       show_source_badge: config.show_source_badge !== false,
       show_area: config.show_area !== false,
       show_time: config.show_time !== false,
+      show_image: config.show_image !== false,
       hide_when_no_alerts: config.hide_when_no_alerts || false,
       hide_when_all_dismissed: config.hide_when_all_dismissed || false,
       sort_by: config.sort_by || 'severity',
@@ -301,10 +359,10 @@ class HaAlertCard extends HTMLElement {
         const alertObj = {
           _id: alertId,
           _sourceIdx: this._config.sources.indexOf(source),
-          _source: source.name || source.entity.split('.').pop(),
+          _source: source.name || entity.attributes.friendly_name || source.entity.split('.').pop(),
           _entity: source.entity,
           _raw: item,
-          title: this._resolveField(item, mapping.title) || 'Alert',
+          title: this._resolveField(item, mapping.title) || entity.attributes.friendly_name || 'Alert',
           message: this._resolveField(item, mapping.message) || '',
           severity: (this._resolveField(item, mapping.severity) || 'unknown').toLowerCase(),
           time: this._resolveField(item, mapping.time) || '',
@@ -475,7 +533,8 @@ class HaAlertCard extends HTMLElement {
           if (alert.url.startsWith('/')) {
             window.history.pushState(null, '', alert.url);
             window.dispatchEvent(new Event('location-changed'));
-          } else if (alert.url.startsWith('http')) {
+          } else if (/^https?:\/\//i.test(alert.url)) {
+            // strict scheme check: feed-supplied URLs may only open http(s)
             window.open(alert.url, '_blank', 'noopener');
           } else {
             const event = new CustomEvent('hass-more-info', {
@@ -538,23 +597,81 @@ class HaAlertCard extends HTMLElement {
     return this._config.severity_colors[severity] || this._config.severity_colors['unknown'] || '#9e9e9e';
   }
 
+  // Detect Lovelace edit mode.  HA does NOT push a "dashboard is being edited"
+  // flag to cards (element.editMode/preview is only true in the card-editor
+  // dialog preview), and the sections view has no `hui-card-options` wrapper and
+  // no `?edit=1` URL.  The one reliable signal is the Lovelace root's editMode,
+  // so we walk up through shadow roots to find `hui-root` and read it.
+  _inEditMode() {
+    // Card-editor dialog preview (HA assigns these on the element).
+    if (this.editMode === true || this.preview === true) return true;
+    // Masonry edit wrapper.
+    try { if (this.closest('hui-card-options')) return true; } catch (e) {}
+    // Walk up (crossing shadow boundaries) to the Lovelace root.
+    let node = this;
+    for (let i = 0; i < 30 && node; i++) {
+      const parent = node.parentNode;
+      // A ShadowRoot (nodeType 11) exposes its host; otherwise step to parent.
+      node = (parent && parent.nodeType === 11) ? parent.host : parent;
+      if (node && node.lovelace && typeof node.lovelace.editMode === 'boolean') {
+        return node.lovelace.editMode;
+      }
+    }
+    return false;
+  }
+
+  _renderEditPlaceholder(reason) {
+    return `
+      <ha-card class="edit-placeholder">
+        <div class="empty-state">
+          <ha-icon icon="mdi:bell-sleep-outline"></ha-icon>
+          <div class="edit-placeholder-title">${this._config.title}</div>
+          <div class="edit-hint">Hidden here (${reason})<br>shown only while editing</div>
+        </div>
+      </ha-card>
+    `;
+  }
+
   _render() {
     if (!this.shadowRoot) return;
 
     const alertCount = this._alerts.length;
     const dismissedCount = this._dismissedAlerts.length;
 
-    // Hide card based on visibility toggles.
+    // Visibility toggles.  In edit mode the card must stay visible & grabbable,
+    // so instead of hiding we render a clean placeholder (see below).
+    const inEditMode = this._inEditMode();
     const totalAlerts = alertCount + dismissedCount;
-    if (this._config.hide_when_no_alerts && totalAlerts === 0) {
-      this.style.display = 'none';
-      return;
-    }
-    if (this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0) {
-      this.style.display = 'none';
+    const wouldHide =
+      (this._config.hide_when_no_alerts && totalAlerts === 0) ||
+      (this._config.hide_when_all_dismissed && totalAlerts > 0 && alertCount === 0);
+
+    if (wouldHide) {
+      if (!inEditMode) {
+        // Not editing — genuinely hide the card.
+        this.style.display = 'none';
+        return;
+      }
+      // Editing — show a tidy placeholder frame instead of the full/cluttered
+      // card, so it stays selectable without exposing the empty header or the
+      // expanded dismissed list.
+      this.style.display = '';
+      const reason = (this._config.hide_when_no_alerts && totalAlerts === 0)
+        ? 'no active alerts'
+        : 'all alerts dismissed';
+      this.shadowRoot.innerHTML = `
+        <style>${this._getStyles()}</style>
+        ${this._renderEditPlaceholder(reason)}
+      `;
       return;
     }
     this.style.display = '';
+
+    // Respect the user's dismissed toggle even while editing.  Forcing it open
+    // in edit mode expanded the whole dismissed list, which looked cluttered;
+    // the card still stays visible in edit mode via the hide-guards above, so
+    // it remains grabbable/configurable while showing the clean empty state.
+    const showDismissed = this._showDismissed;
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
@@ -562,13 +679,13 @@ class HaAlertCard extends HTMLElement {
         <div class="card-header">
           <div class="card-header-left">
             <ha-icon icon="mdi:bell-alert-outline"></ha-icon>
-            <span class="card-title">${this._config.title}</span>
+            <span class="card-title">${escapeHtml(this._config.title)}</span>
             ${alertCount > 0 ? `<span class="badge">${alertCount}${this._totalUndismissed > alertCount ? ` of ${this._totalUndismissed}` : ''}</span>` : ''}
           </div>
           <div class="card-header-right">
             ${dismissedCount > 0 ? `
-              <span class="toggle-dismissed" id="toggleDismissed" title="${this._showDismissed ? 'Hide' : 'Show'} dismissed">
-                <ha-icon icon="mdi:${this._showDismissed ? 'eye-off' : 'eye'}"></ha-icon>
+              <span class="toggle-dismissed" id="toggleDismissed" title="${showDismissed ? 'Hide' : 'Show'} dismissed">
+                <ha-icon icon="mdi:${showDismissed ? 'eye-off' : 'eye'}"></ha-icon>
                 <span>${dismissedCount}</span>
               </span>
             ` : ''}
@@ -578,9 +695,9 @@ class HaAlertCard extends HTMLElement {
           </div>
         </div>
         <div class="alert-list">
-          ${alertCount === 0 && (!this._showDismissed || dismissedCount === 0) ? this._renderEmpty() : ''}
+          ${alertCount === 0 && (!showDismissed || dismissedCount === 0) ? this._renderEmpty() : ''}
           ${this._alerts.map(a => this._renderAlert(a)).join('')}
-          ${this._showDismissed && dismissedCount > 0 ? `
+          ${showDismissed && dismissedCount > 0 ? `
             <div class="dismissed-section">
               <div class="dismissed-header">
                 <span>Dismissed (${dismissedCount})</span>
@@ -608,7 +725,8 @@ class HaAlertCard extends HTMLElement {
       if (!alert) return;
       const source = this._config.sources?.[alert._sourceIdx];
       const detailAttr = source?.detail_attribute || 'formatted_content';
-      const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+      const detailContent = this._resolveField(alert._raw, detailAttr)
+        ?? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
       if (detailContent) el.content = String(detailContent);
     });
 
@@ -661,12 +779,14 @@ class HaAlertCard extends HTMLElement {
 
   _renderDismissedAlert(alert) {
     const color = this._getSeverityColor(alert.severity);
+    // color is safe: a lookup VALUE from config/default maps (the feed-derived
+    // severity is only used as the lookup key).  Everything else is escaped.
     return `
-      <div class="dismissed-item" data-alert-id="${alert._id}">
+      <div class="dismissed-item" data-alert-id="${escapeHtml(alert._id)}">
         <div class="severity-bar" style="background: ${color}; opacity: 0.4"></div>
         <div class="alert-content">
-          <div class="alert-title">${alert.title}</div>
-          ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+          <div class="alert-title">${escapeHtml(alert.title)}</div>
+          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}
         </div>
         <div class="restore-btn" title="Restore">
           <ha-icon icon="mdi:restore"></ha-icon>
@@ -679,29 +799,41 @@ class HaAlertCard extends HTMLElement {
     const isExpanded = this._expanded.has(alert._id);
     const color = this._getSeverityColor(alert.severity);
     const timeStr = this._formatTime(alert.time);
+    const source = this._config.sources?.[alert._sourceIdx];
+    const imageAttr = source?.image_attribute;
+    const imageUrl = imageAttr
+      ? (alert._raw?.[imageAttr] ?? this._hass?.states?.[alert._entity]?.attributes?.[imageAttr])
+      : null;
+    const safeImg = this._config.show_image && imageUrl ? safeImageUrl(imageUrl) : '';
 
+    // color is safe: a lookup VALUE from config/default maps (the feed-derived
+    // severity is only used as the lookup key).  All feed-derived values —
+    // including _id (attribute context) and timeStr (falls back to the raw
+    // feed string when unparseable) — are escaped.
     return `
-      <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${alert._id}">
+      <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${escapeHtml(alert._id)}">
         <div class="severity-bar" style="background: ${color}"></div>
         <div class="alert-content">
           <div class="alert-top-row">
-            ${this._config.show_source_badge ? `<span class="alert-source">${alert._source}</span>` : ''}
-            ${this._config.show_area && alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
-            ${this._config.show_time && timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
+            ${safeImg ? `<img class="alert-image" src="${escapeHtml(safeImg)}" alt="" />` : ''}
+            ${this._config.show_source_badge ? `<span class="alert-source">${escapeHtml(alert._source)}</span>` : ''}
+            ${this._config.show_area && alert.area ? `<span class="alert-area">${escapeHtml(alert.area)}</span>` : ''}
+            ${this._config.show_time && timeStr ? `<span class="alert-time">${escapeHtml(timeStr)}</span>` : ''}
           </div>
-          <div class="alert-title">${alert.title}</div>
-          ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+          <div class="alert-title">${escapeHtml(alert.title)}</div>
+          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}
           ${isExpanded && alert.instruction ? `
             <div class="alert-instruction">
-              <strong>Instruction:</strong> ${alert.instruction}
+              <strong>Instruction:</strong> ${escapeHtml(alert.instruction)}
             </div>
           ` : ''}
           ${isExpanded ? (() => {
             const source = this._config.sources?.[alert._sourceIdx];
             const detailAttr = source?.detail_attribute || 'formatted_content';
-            const detailContent = this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
+            const detailContent = this._resolveField(alert._raw, detailAttr)
+              ?? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
             if (detailContent) {
-              return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
+              return `<ha-markdown class="alert-formatted-content" data-content="${escapeHtml(alert._id)}"></ha-markdown>`;
             }
             return '';
           })() : ''}
@@ -861,6 +993,13 @@ class HaAlertCard extends HTMLElement {
         flex-wrap: wrap;
       }
 
+      .alert-image {
+        height: 32px;
+        width: auto;
+        flex-shrink: 0;
+        vertical-align: middle;
+      }
+
       .alert-source {
         font-size: var(--ha-font-size-xs, 10px);
         font-weight: 600;
@@ -986,6 +1125,23 @@ class HaAlertCard extends HTMLElement {
         margin-bottom: 8px;
       }
 
+      /* Edit-mode placeholder (shown while editing when the card would be hidden) */
+      .edit-placeholder {
+        border: 1px dashed var(--divider-color, #9e9e9e);
+        background: transparent;
+        opacity: 0.85;
+      }
+      .edit-placeholder-title {
+        font-weight: 500;
+        color: var(--primary-text-color);
+        margin-bottom: 2px;
+      }
+      .edit-hint {
+        font-size: var(--ha-font-size-s, 12px);
+        line-height: 1.3;
+        opacity: 0.7;
+      }
+
       /* Dismissed section */
       .dismissed-section {
         border-top: 1px dashed var(--divider-color, #e0e0e0);
@@ -1055,6 +1211,7 @@ class HaAlertCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._expandedSources = new Set();
+    this._expandedPanels = new Set(['sources']); // sources starts expanded
     this._debug = true; // Enable debug logging
   }
 
@@ -1085,12 +1242,19 @@ class HaAlertCardEditor extends HTMLElement {
     const tapAction = config.tap_action || {};
     const holdAction = config.hold_action || {};
 
+    // Save expanded state of named panels before replacing DOM.
+    this.shadowRoot.querySelectorAll('ha-expansion-panel[data-panel-id]').forEach(el => {
+      const id = el.dataset.panelId;
+      if (el.expanded) this._expandedPanels.add(id);
+      else this._expandedPanels.delete(id);
+    });
+
     this.shadowRoot.innerHTML = `
       <style>${this._getEditorStyles()}</style>
       <div class="editor">
 
         <!-- Appearance -->
-        <ha-expansion-panel outlined>
+        <ha-expansion-panel outlined data-panel-id="appearance" ${this._expandedPanels.has('appearance') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:palette-outline"></ha-icon>
             <span>Appearance</span>
@@ -1136,6 +1300,10 @@ class HaAlertCardEditor extends HTMLElement {
                 <span>Show source badges</span>
               </label>
               <label class="switch-row">
+                <ha-switch id="show-image"></ha-switch>
+                <span>Show images (requires Image attribute per source)</span>
+              </label>
+              <label class="switch-row">
                 <ha-switch id="show-time"></ha-switch>
                 <span>Show time</span>
               </label>
@@ -1156,7 +1324,7 @@ class HaAlertCardEditor extends HTMLElement {
         </ha-expansion-panel>
 
         <!-- Sources -->
-        <ha-expansion-panel outlined expanded>
+        <ha-expansion-panel outlined data-panel-id="sources" ${this._expandedPanels.has('sources') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:database-outline"></ha-icon>
             <span>Sources</span>
@@ -1174,7 +1342,7 @@ class HaAlertCardEditor extends HTMLElement {
         </ha-expansion-panel>
 
         <!-- Interactions -->
-        <ha-expansion-panel outlined>
+        <ha-expansion-panel outlined data-panel-id="interactions" ${this._expandedPanels.has('interactions') ? 'expanded' : ''}>
           <div slot="header" class="panel-header">
             <ha-icon icon="mdi:gesture-tap"></ha-icon>
             <span>Interactions</span>
@@ -1260,6 +1428,8 @@ class HaAlertCardEditor extends HTMLElement {
     if (showTime) showTime.checked = config.show_time !== false;
     const showArea = root.getElementById('show-area');
     if (showArea) showArea.checked = config.show_area !== false;
+    const showImage = root.getElementById('show-image');
+    if (showImage) showImage.checked = config.show_image !== false;
     const hideWhenNoAlerts = root.getElementById('hide-when-no-alerts');
     if (hideWhenNoAlerts) hideWhenNoAlerts.checked = !!config.hide_when_no_alerts;
     const hideWhenAllDismissed = root.getElementById('hide-when-all-dismissed');
@@ -1360,6 +1530,20 @@ class HaAlertCardEditor extends HTMLElement {
               value="${source.detail_attribute || ''}"
               placeholder="formatted_content"
               title="Entity attribute to render as markdown when an alert is expanded. Defaults to 'formatted_content' if present."
+            />
+          </div>
+        </div>
+        <div class="row">
+          <label class="source-field-label">Image attribute</label>
+          <div class="source-field-value">
+            <input
+              type="text"
+              class="source-field-input"
+              data-idx="${idx}"
+              data-field="image_attribute"
+              value="${source.image_attribute || ''}"
+              placeholder="e.g. entity_picture, travel_tag"
+              title="Attribute name for an image shown in each alert row. Checked per-alert first, then on the entity."
             />
           </div>
         </div>
@@ -1470,6 +1654,9 @@ class HaAlertCardEditor extends HTMLElement {
     root.getElementById('show-area')?.addEventListener('change', (e) => {
       this._updateConfig('show_area', e.target.checked);
     });
+    root.getElementById('show-image')?.addEventListener('change', (e) => {
+      this._updateConfig('show_image', e.target.checked);
+    });
     root.getElementById('hide-when-no-alerts')?.addEventListener('change', (e) => {
       this._updateConfig('hide_when_no_alerts', e.target.checked);
     });
@@ -1541,7 +1728,8 @@ class HaAlertCardEditor extends HTMLElement {
         e.stopPropagation();
         const idx = parseInt(e.currentTarget.dataset.idx, 10);
         if (isNaN(idx)) return;
-        this._config.sources.splice(idx, 1);
+        const sources = this._config.sources.filter((_, i) => i !== idx);
+        this._config = { ...this._config, sources };
         this._expandedSources.delete(idx);
         this._fireChanged();
         this._render();

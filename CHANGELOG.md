@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026.7.4] — 2026-08-03
+
+### Security
+
+- **Alert fields from third-party feeds are now HTML-escaped before rendering** — the card interpolated `title`, `message`, `area`, `instruction`, the source badge, the formatted time and the alert id straight into `shadowRoot.innerHTML`. Because those values come from external feeds (USGS, NWS, RSS, …), a feed item whose text contained markup such as `<img src=x onerror=…>` would execute script in the Home Assistant frontend. All feed-derived values now pass through an escape helper, in both text and attribute contexts, and in both the active and dismissed alert renderers.
+
+  Reported by [@frenck](https://github.com/frenck) during HACS default-repository review.
+
+- **Feed-supplied image URLs are restricted to safe schemes** — `image_attribute` values may now only be `http(s)`, protocol-relative, site-relative, or `data:image/…`. Anything else (for example `javascript:`) renders no image rather than an active URL.
+
+- **Tap-action URLs require an explicit `http(s)` scheme** — the external-link branch previously accepted any value merely *starting with* `http`, and now matches `https?://` strictly.
+
+### Unchanged by design
+
+- **Expandable detail content still renders as markdown.** The `detail_attribute` (default `formatted_content`) is assigned to `<ha-markdown>` as a property, so Home Assistant's own markdown renderer and sanitizer handles it — bullet lists and other formatting in NWS descriptions continue to work exactly as before.
+- Severity colours are unaffected: the feed-derived severity is only ever used as a *lookup key* into the built-in or user-configured colour map, and the resulting colour comes from that map, never from feed text.
+- Legitimate punctuation is preserved. Ampersands, apostrophes, quotes, em/en dashes and accented characters render as typed — escaping affects only markup, not text.
+
+### Internal
+
+- Added `test/xss.test.js` — a dependency-free regression suite (`node test/xss.test.js`) that renders the real `_renderAlert` / `_renderDismissedAlert` output against hostile input and asserts that only the card's own inert markup survives, that unsafe image URLs are dropped, that the detail pane stays delegated to `ha-markdown`, and that intended text and punctuation are preserved.
+
 ## [2026.7.3] — 2026-07-28
 
 ### Overview

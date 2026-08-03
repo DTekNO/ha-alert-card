@@ -9,6 +9,37 @@
 
 const CARD_VERSION = '2026.7.2';
 
+// --- HTML escaping -----------------------------------------------------------
+// Alert fields come from third-party feeds (USGS, NWS, RSS, ...) and are
+// rendered into shadowRoot.innerHTML.  Every feed-derived value MUST pass
+// through escapeHtml() on its way into markup (text and attribute contexts
+// alike), so a feed item containing e.g. <img src=x onerror=...> renders as
+// inert text instead of executing in the Home Assistant frontend.
+//
+// Deliberately NOT escaped: the expandable detail (formatted_content), which
+// is assigned to <ha-markdown>.content as a property — ha-markdown renders it
+// with Home Assistant's own markdown sanitizer, preserving the intended
+// formatting (NWS bullet lists etc.) without allowing raw HTML through.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Image URLs from feeds may only use safe schemes: http(s), protocol-relative,
+// site-relative, or inline data:image.  Anything else (javascript:, etc.)
+// renders no image at all.
+function safeImageUrl(url) {
+  const s = String(url ?? '').trim();
+  if (/^(https?:)?\/\//i.test(s) || (s.startsWith('/') && !s.startsWith('//')) || /^data:image\//i.test(s)) {
+    return s;
+  }
+  return '';
+}
+
 // CAP-standard default field mapping
 const DEFAULT_MAPPING = {
   title: 'event',           // CAP: <event> — short alert type name
@@ -502,7 +533,8 @@ class HaAlertCard extends HTMLElement {
           if (alert.url.startsWith('/')) {
             window.history.pushState(null, '', alert.url);
             window.dispatchEvent(new Event('location-changed'));
-          } else if (alert.url.startsWith('http')) {
+          } else if (/^https?:\/\//i.test(alert.url)) {
+            // strict scheme check: feed-supplied URLs may only open http(s)
             window.open(alert.url, '_blank', 'noopener');
           } else {
             const event = new CustomEvent('hass-more-info', {
@@ -647,7 +679,7 @@ class HaAlertCard extends HTMLElement {
         <div class="card-header">
           <div class="card-header-left">
             <ha-icon icon="mdi:bell-alert-outline"></ha-icon>
-            <span class="card-title">${this._config.title}</span>
+            <span class="card-title">${escapeHtml(this._config.title)}</span>
             ${alertCount > 0 ? `<span class="badge">${alertCount}${this._totalUndismissed > alertCount ? ` of ${this._totalUndismissed}` : ''}</span>` : ''}
           </div>
           <div class="card-header-right">
@@ -747,12 +779,14 @@ class HaAlertCard extends HTMLElement {
 
   _renderDismissedAlert(alert) {
     const color = this._getSeverityColor(alert.severity);
+    // color is safe: a lookup VALUE from config/default maps (the feed-derived
+    // severity is only used as the lookup key).  Everything else is escaped.
     return `
-      <div class="dismissed-item" data-alert-id="${alert._id}">
+      <div class="dismissed-item" data-alert-id="${escapeHtml(alert._id)}">
         <div class="severity-bar" style="background: ${color}; opacity: 0.4"></div>
         <div class="alert-content">
-          <div class="alert-title">${alert.title}</div>
-          ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+          <div class="alert-title">${escapeHtml(alert.title)}</div>
+          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}
         </div>
         <div class="restore-btn" title="Restore">
           <ha-icon icon="mdi:restore"></ha-icon>
@@ -770,22 +804,27 @@ class HaAlertCard extends HTMLElement {
     const imageUrl = imageAttr
       ? (alert._raw?.[imageAttr] ?? this._hass?.states?.[alert._entity]?.attributes?.[imageAttr])
       : null;
+    const safeImg = this._config.show_image && imageUrl ? safeImageUrl(imageUrl) : '';
 
+    // color is safe: a lookup VALUE from config/default maps (the feed-derived
+    // severity is only used as the lookup key).  All feed-derived values —
+    // including _id (attribute context) and timeStr (falls back to the raw
+    // feed string when unparseable) — are escaped.
     return `
-      <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${alert._id}">
+      <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${escapeHtml(alert._id)}">
         <div class="severity-bar" style="background: ${color}"></div>
         <div class="alert-content">
           <div class="alert-top-row">
-            ${this._config.show_image && imageUrl ? `<img class="alert-image" src="${imageUrl}" alt="" />` : ''}
-            ${this._config.show_source_badge ? `<span class="alert-source">${alert._source}</span>` : ''}
-            ${this._config.show_area && alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
-            ${this._config.show_time && timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
+            ${safeImg ? `<img class="alert-image" src="${escapeHtml(safeImg)}" alt="" />` : ''}
+            ${this._config.show_source_badge ? `<span class="alert-source">${escapeHtml(alert._source)}</span>` : ''}
+            ${this._config.show_area && alert.area ? `<span class="alert-area">${escapeHtml(alert.area)}</span>` : ''}
+            ${this._config.show_time && timeStr ? `<span class="alert-time">${escapeHtml(timeStr)}</span>` : ''}
           </div>
-          <div class="alert-title">${alert.title}</div>
-          ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+          <div class="alert-title">${escapeHtml(alert.title)}</div>
+          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}
           ${isExpanded && alert.instruction ? `
             <div class="alert-instruction">
-              <strong>Instruction:</strong> ${alert.instruction}
+              <strong>Instruction:</strong> ${escapeHtml(alert.instruction)}
             </div>
           ` : ''}
           ${isExpanded ? (() => {
@@ -794,7 +833,7 @@ class HaAlertCard extends HTMLElement {
             const detailContent = this._resolveField(alert._raw, detailAttr)
               ?? this._hass?.states?.[alert._entity]?.attributes?.[detailAttr];
             if (detailContent) {
-              return `<ha-markdown class="alert-formatted-content" data-content="${alert._id}"></ha-markdown>`;
+              return `<ha-markdown class="alert-formatted-content" data-content="${escapeHtml(alert._id)}"></ha-markdown>`;
             }
             return '';
           })() : ''}
