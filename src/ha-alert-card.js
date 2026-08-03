@@ -4,7 +4,8 @@
  * Uses CAP (Common Alerting Protocol) field names as defaults — entities following CAP
  * work with zero mapping configuration.
  *
- * Version: 0.1.0
+ * The version is injected at release time from the git tag — see
+ * .github/workflows/release.yml.  Do not edit it by hand.
  */
 
 const CARD_VERSION = '2026.7.2';
