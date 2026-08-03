@@ -1,0 +1,53 @@
+name: Sync dist
+
+# dist/ha-alert-card.js is a build artifact, but it stays committed because HACS
+# resolves a plugin file from the release asset, then dist/, then the repo root
+# — so it must exist for structure validation even between releases.
+#
+# Being committed means it can silently drift from src/ (it once lagged by
+# months, which made an unrelated commit's diff look like it contained lost
+# work).  This workflow keeps it in step: on every push to main that touches
+# src/, it rebuilds dist/ and commits the result only if it actually changed.
+#
+# The version string is deliberately NOT set here — release.yml injects it from
+# the git tag.  Between releases dist/ therefore carries whatever CARD_VERSION
+# src/ has, which is exactly the intent: one source of truth per concern.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/sync-dist.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # Never let two syncs race on the same branch.
+  group: sync-dist-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Don't respond to this workflow's own commit.
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild dist from src
+        run: cp src/ha-alert-card.js dist/ha-alert-card.js
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- dist/; then
+            echo "dist already matches src — nothing to do"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/ha-alert-card.js
+          git commit -m "chore: sync dist with src [skip ci]"
+          git push

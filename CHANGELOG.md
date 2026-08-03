@@ -1,6 +1,6 @@
 # Changelog
 
-## [2026.7.4] — 2026-08-03
+## [2026.8.1] — 2026-08-03
 
 ### Security
 
@@ -21,6 +21,8 @@
 ### Internal
 
 - Added `test/xss.test.js` — a dependency-free regression suite (`node test/xss.test.js`) that renders the real `_renderAlert` / `_renderDismissedAlert` output against hostile input and asserts that only the card's own inert markup survives, that unsafe image URLs are dropped, that the detail pane stays delegated to `ha-markdown`, and that intended text and punctuation are preserved.
+- Removed a stale `Version: 0.1.0` line from the file header, left behind by the earliest releases. The version comes solely from the git tag, injected into `dist/` by the release workflow.
+- Added a **Sync dist** workflow: pushes to `main` that touch `src/` rebuild `dist/ha-alert-card.js` and commit it only if it changed. `dist/` stays committed because HACS resolves a plugin file from the release asset, then `dist/`, then the repo root — but being committed meant it could silently drift from `src/` (it had lagged by several releases, which made an unrelated commit's diff appear to contain lost work).
 
 ## [2026.7.3] — 2026-07-28
 
