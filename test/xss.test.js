@@ -179,6 +179,53 @@ console.log('_renderAlert (hostile image URL)');
   check('safe image src still rendered', html.includes('src="https://ok/i.png"'));
 }
 
+console.log('_renderAlert (default image attribute)');
+{
+  // No image_attribute configured: entity_picture is the default, so the common
+  // case needs no configuration.
+  const card = makeCard({ sources: [{ entity: 'sensor.feed' }] });
+  card._hass = { states: { 'sensor.feed': { attributes: { entity_picture: '/api/image_proxy/x' } } } };
+  const alert = hostileAlert({ _entity: 'sensor.feed' });
+  const html = card._renderAlert(alert);
+  assertInert('default image', html);
+  check('entity_picture used when no image_attribute is set',
+        html.includes('src="/api/image_proxy/x"'));
+}
+{
+  // A per-alert value still wins over the entity attribute.
+  const card = makeCard({ sources: [{ entity: 'sensor.feed' }] });
+  card._hass = { states: { 'sensor.feed': { attributes: { entity_picture: '/entity.png' } } } };
+  const alert = hostileAlert({ _entity: 'sensor.feed', _raw: { entity_picture: '/peritem.png' } });
+  check('per-alert entity_picture takes precedence',
+        card._renderAlert(alert).includes('src="/peritem.png"'));
+}
+{
+  // An explicit image_attribute still overrides the default.
+  const card = makeCard({ sources: [{ entity: 'sensor.feed', image_attribute: 'travel_tag' }] });
+  card._hass = { states: { 'sensor.feed': { attributes: {
+    entity_picture: '/should-not-be-used.png', travel_tag: '/badge.png' } } } };
+  const alert = hostileAlert({ _entity: 'sensor.feed' });
+  const html = card._renderAlert(alert);
+  check('explicit image_attribute overrides the default', html.includes('src="/badge.png"'));
+  check('default is not used when overridden', !html.includes('should-not-be-used'));
+}
+{
+  // show_image remains the way to turn images off entirely.
+  const card = makeCard({ show_image: false, sources: [{ entity: 'sensor.feed' }] });
+  card._hass = { states: { 'sensor.feed': { attributes: { entity_picture: '/x.png' } } } };
+  const alert = hostileAlert({ _entity: 'sensor.feed' });
+  check('show_image false suppresses the default image',
+        !card._renderAlert(alert).includes('<img class="alert-image"'));
+}
+{
+  // An entity with no entity_picture must simply render no image.
+  const card = makeCard({ sources: [{ entity: 'sensor.feed' }] });
+  card._hass = { states: { 'sensor.feed': { attributes: {} } } };
+  const alert = hostileAlert({ _entity: 'sensor.feed' });
+  check('missing entity_picture renders no image',
+        !card._renderAlert(alert).includes('<img class="alert-image"'));
+}
+
 console.log('_renderDismissedAlert');
 {
   const html = makeCard()._renderDismissedAlert(hostileAlert());

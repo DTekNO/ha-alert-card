@@ -10,6 +10,10 @@
 
 const CARD_VERSION = '2026.7.2';
 
+// Attribute consulted for each alert's inline image when a source does not name
+// one. Overridable per source via image_attribute; disable images with show_image.
+const DEFAULT_IMAGE_ATTRIBUTE = 'entity_picture';
+
 // --- HTML escaping -----------------------------------------------------------
 // Alert fields come from third-party feeds (USGS, NWS, RSS, ...) and are
 // rendered into shadowRoot.innerHTML.  Every feed-derived value MUST pass
@@ -801,10 +805,13 @@ class HaAlertCard extends HTMLElement {
     const color = this._getSeverityColor(alert.severity);
     const timeStr = this._formatTime(alert.time);
     const source = this._config.sources?.[alert._sourceIdx];
-    const imageAttr = source?.image_attribute;
-    const imageUrl = imageAttr
-      ? (alert._raw?.[imageAttr] ?? this._hass?.states?.[alert._entity]?.attributes?.[imageAttr])
-      : null;
+    // entity_picture is the default: almost every entity that has a meaningful
+    // image exposes it there, so the common case should need no configuration.
+    // Set image_attribute to name a different one (travel_tag, an icon URL, …);
+    // use show_image: false to turn images off entirely.
+    const imageAttr = source?.image_attribute || DEFAULT_IMAGE_ATTRIBUTE;
+    const imageUrl =
+      alert._raw?.[imageAttr] ?? this._hass?.states?.[alert._entity]?.attributes?.[imageAttr];
     const safeImg = this._config.show_image && imageUrl ? safeImageUrl(imageUrl) : '';
 
     // color is safe: a lookup VALUE from config/default maps (the feed-derived
@@ -1543,8 +1550,8 @@ class HaAlertCardEditor extends HTMLElement {
               data-idx="${idx}"
               data-field="image_attribute"
               value="${source.image_attribute || ''}"
-              placeholder="e.g. entity_picture, travel_tag"
-              title="Attribute name for an image shown in each alert row. Checked per-alert first, then on the entity."
+              placeholder="entity_picture (default)"
+              title="Attribute name for an image shown in each alert row. Checked per-alert first, then on the entity. Leave blank to use entity_picture; use the Show image toggle to turn images off."
             />
           </div>
         </div>

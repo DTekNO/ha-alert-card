@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Per-alert images now work without configuration.** `image_attribute` defaults to
+  `entity_picture`, which is where almost every entity that has a meaningful image
+  puts it — so a source that previously showed no image will now show one, with no
+  config change. Name a different attribute to override it (`travel_tag`, an icon
+  URL, and so on), or set `show_image: false` to turn images off entirely.
+
+  Precedence is unchanged: the per-alert value wins over the entity attribute, and
+  an entity without the attribute renders no image rather than a broken one. Feed
+  URLs are still restricted to safe schemes.
+
 ## [2026.8.1] — 2026-08-03
 
 ### Overview
