@@ -637,6 +637,34 @@ class HaAlertCard extends HTMLElement {
     `;
   }
 
+  /**
+   * Tell Home Assistant to keep this element in the DOM while it is hidden.
+   *
+   * hui-card removes a hidden card element from the tree unless it asks to stay.
+   * Staying costs nothing here — the card has no timers, only hass-driven renders —
+   * and it avoids a disconnect/reconnect cycle on every hide, which would tear down
+   * and rebuild the location listeners each time an alert list emptied.
+   */
+  get connectedWhileHidden() {
+    return true;
+  }
+
+  /**
+   * Hide or show the card the way the sections grid can see.
+   *
+   * Setting our own style.display hid the element but not the hui-card wrapper
+   * around it, and the wrapper is what owns the grid cell: with a fixed
+   * grid_options.rows the section kept the cell reserved and showed a blank block
+   * the size of the card (reported 23.09.2026). hui-card reads the element's
+   * `hidden` property and, on `card-visibility-changed`, hides *itself* — which is
+   * what hui-grid-section's `.card:has(> *[hidden])` rule collapses.
+   */
+  _setHidden(hide) {
+    if (this.hidden === hide) return;
+    this.hidden = hide;
+    this.dispatchEvent(new Event('card-visibility-changed', { bubbles: true, composed: true }));
+  }
+
   _render() {
     if (!this.shadowRoot) return;
 
@@ -653,14 +681,14 @@ class HaAlertCard extends HTMLElement {
 
     if (wouldHide) {
       if (!inEditMode) {
-        // Not editing — genuinely hide the card.
-        this.style.display = 'none';
+        // Not editing — genuinely hide the card, and its grid cell with it.
+        this._setHidden(true);
         return;
       }
       // Editing — show a tidy placeholder frame instead of the full/cluttered
       // card, so it stays selectable without exposing the empty header or the
       // expanded dismissed list.
-      this.style.display = '';
+      this._setHidden(false);
       const reason = (this._config.hide_when_no_alerts && totalAlerts === 0)
         ? 'no active alerts'
         : 'all alerts dismissed';
@@ -670,7 +698,7 @@ class HaAlertCard extends HTMLElement {
       `;
       return;
     }
-    this.style.display = '';
+    this._setHidden(false);
 
     // Respect the user's dismissed toggle even while editing.  Forcing it open
     // in edit mode expanded the whole dismissed list, which looked cluttered;
@@ -862,6 +890,12 @@ class HaAlertCard extends HTMLElement {
 
   _getStyles() {
     return `
+      /* Belt and braces: hui-card hides its wrapper when we set the hidden
+         property, but if anything ever renders this element bare, the UA's
+         [hidden] rule must not lose to the :host display below. */
+      :host([hidden]) {
+        display: none !important;
+      }
       :host {
         --alert-card-badge-bg: var(--error-color, #db4437);
         display: block;
