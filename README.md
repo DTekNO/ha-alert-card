@@ -302,6 +302,13 @@ Escaping was added in **2026.8.1** after a report from [@frenck](https://github.
 
 ## Compatibility
 
+**Requires Home Assistant 2024.6.0 or newer.** The card hides itself through the
+dashboard's card wrapper — the same mechanism a conditional card uses — so that a hidden
+card gives up its grid cell in a sections view. That wrapper contract arrived in
+2024.6.0 ([frontend #20966](https://github.com/home-assistant/frontend/pull/20966)); on
+older releases the card would hide but leave a blank cell behind. HACS enforces the
+minimum from `hacs.json`.
+
 Tested with:
 - [Norway Alerts](https://github.com/jnxxx/homeassistant-norway_alerts) (CAP-native, zero-config)
 - [Entur SX](https://github.com/jnxxx/ha-entur_sx) (with mapping)

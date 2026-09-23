@@ -11,6 +11,10 @@
   watches, so the cell collapses with it, exactly as a conditional card's does. Masonry
   and `rows: auto` layouts were already fine and are unchanged.
 
+  This relies on a wrapper contract that arrived in Home Assistant 2024.6.0, so that is
+  now the declared minimum in `hacs.json` — HACS will not offer the card to older
+  installs. There was no minimum before.
+
 ### Changed
 
 - **Per-alert images now work without configuration.** `image_attribute` defaults to
