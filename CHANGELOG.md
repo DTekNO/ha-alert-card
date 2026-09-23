@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2026.9.1] — 2026-09-23
 
 ### Fixed
 
@@ -8,8 +8,9 @@
   or `hide_when_all_dismissed` set and a fixed `grid_options.rows` in a sections view,
   the card hid itself but the section kept the space reserved — a blank block the size
   of the card. The card now hides through the mechanism Home Assistant's card wrapper
-  watches, so the cell collapses with it, exactly as a conditional card's does. Masonry
-  and `rows: auto` layouts were already fine and are unchanged.
+  watches, so the cell collapses with it, exactly as a conditional card's does — and a
+  neighbouring card reflows into the space. Masonry and `rows: auto` layouts were
+  already fine and are unchanged.
 
   This relies on a wrapper contract that arrived in Home Assistant 2024.6.0, so that is
   now the declared minimum in `hacs.json` — HACS will not offer the card to older
