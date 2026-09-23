@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A hidden card no longer leaves its grid cell behind.** With `hide_when_no_alerts`
+  or `hide_when_all_dismissed` set and a fixed `grid_options.rows` in a sections view,
+  the card hid itself but the section kept the space reserved — a blank block the size
+  of the card. The card now hides through the mechanism Home Assistant's card wrapper
+  watches, so the cell collapses with it, exactly as a conditional card's does. Masonry
+  and `rows: auto` layouts were already fine and are unchanged.
+
 ### Changed
 
 - **Per-alert images now work without configuration.** `image_attribute` defaults to
