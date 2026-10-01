@@ -79,6 +79,10 @@ console.log('each field keeps its meaning');
         /alert-source">COAST<\/span>\s*<span class="alert-area">Clark County<\/span>/.test(c._renderAlert(alert({ area: 'Clark County' }))));
   check('area never becomes the subtitle', !c._renderAlert(alert({ message: '', area: 'Vestland' })).includes('alert-subtitle'));
   check('no message: no subtitle element', !c._renderAlert(alert({ message: '' })).includes('alert-subtitle'));
+  check('an area that merely repeats the title is dropped (Entur maps area to the summary)',
+        !c._renderAlert(alert({ title: 'Haldeplass Nonneseter stengd', area: 'Haldeplass Nonneseter stengd' })).includes('alert-area'));
+  check('a travel-tag image keeps its own width',
+        /ha-card\.compact \.alert-image \{[^}]*width: auto;[^}]*object-fit: contain/.test(source));
   check('area hidden when show_area is off',
         !makeCard({ compact: true, show_area: false })._renderAlert(alert({ area: 'X' })).includes('alert-area'));
 }

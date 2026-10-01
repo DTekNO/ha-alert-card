@@ -908,6 +908,11 @@ class HaAlertCard extends HTMLElement {
    * deferred. Designed in a markdown-card prototype 30.09.2026.
    */
   _renderCompactRow(alert, safeImg, timeStr, isExpanded) {
+    // Entur maps `area` to the disruption summary, which is also the title, so the
+    // meta cell repeated the headline beside a badge that already named the line.
+    // An area that only restates the title carries nothing; drop it.
+    const area = this._config.show_area && alert.area && alert.area !== alert.title
+      ? alert.area : '';
     return `
           <div class="alert-row">
             ${safeImg ? `<img class="alert-image" src="${escapeHtml(safeImg)}" alt="" />` : ''}
@@ -917,7 +922,7 @@ class HaAlertCard extends HTMLElement {
             </div>
             <div class="alert-meta">
               ${this._config.show_source_badge ? `<span class="alert-source">${escapeHtml(alert._source)}</span>` : ''}
-              ${this._config.show_area && alert.area ? `<span class="alert-area">${escapeHtml(alert.area)}</span>` : ''}
+              ${area ? `<span class="alert-area">${escapeHtml(area)}</span>` : ''}
               ${this._config.show_time && timeStr ? `<span class="alert-time">${escapeHtml(timeStr)}</span>` : ''}
             </div>
           </div>
@@ -1158,9 +1163,12 @@ class HaAlertCard extends HTMLElement {
         min-width: 0;
       }
       ha-card.compact .alert-image {
-        width: 44px;
+        /* Height fixed, width its own: a square photo is 44x44, a wide travel tag
+           keeps its line number legible instead of being cropped to a square. */
         height: 44px;
-        object-fit: cover;
+        width: auto;
+        max-width: 96px;
+        object-fit: contain;
         border-radius: 4px;
       }
       ha-card.compact .alert-text {
@@ -1187,6 +1195,11 @@ class HaAlertCard extends HTMLElement {
         gap: 6px;
         flex-shrink: 0;
         white-space: nowrap;
+      }
+      ha-card.compact .alert-area {
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       ha-card.compact .alert-time {
         margin-left: 0;
