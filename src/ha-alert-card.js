@@ -969,6 +969,9 @@ class HaAlertCard extends HTMLElement {
         gap: 10px;
       }
       .card-header-left ha-icon {
+        /* ha-icon is inline by default, so its box follows the line box and the
+           baseline gap left the bell sitting a few px below the title's centre. */
+        display: flex;
         --mdc-icon-size: 20px;
         color: var(--primary-text-color);
         opacity: 0.8;
