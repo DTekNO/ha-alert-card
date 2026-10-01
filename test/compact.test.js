@@ -81,8 +81,8 @@ console.log('each field keeps its meaning');
   check('no message: no subtitle element', !c._renderAlert(alert({ message: '' })).includes('alert-subtitle'));
   check('an area that merely repeats the title is dropped (Entur maps area to the summary)',
         !c._renderAlert(alert({ title: 'Haldeplass Nonneseter stengd', area: 'Haldeplass Nonneseter stengd' })).includes('alert-area'));
-  check('a travel-tag image keeps its own width',
-        /ha-card\.compact \.alert-image \{[^}]*width: auto;[^}]*object-fit: contain/.test(source));
+  check('images render at natural size, capped, so tags stay small and photos stay 44px',
+        /ha-card\.compact \.alert-image \{[^}]*height: auto;[^}]*max-height: 44px;[^}]*max-width: 96px/.test(source));
   check('area hidden when show_area is off',
         !makeCard({ compact: true, show_area: false })._renderAlert(alert({ area: 'X' })).includes('alert-area'));
 }

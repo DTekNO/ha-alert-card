@@ -1163,15 +1163,15 @@ class HaAlertCard extends HTMLElement {
         min-width: 0;
       }
       ha-card.compact .alert-image {
-        /* Height fixed, width its own: a square photo is 44x44, a wide travel tag
-           keeps its line number legible instead of being cropped to a square.
-           The cap is sized so an Entur tag with a four-character line name still
-           renders at full height; at 96px a "1033" tag shrank to 36px and sat
-           visibly lower than a "1" tag beside it. */
-        height: 44px;
+        /* Natural size, capped. A generated travel tag carries its own dimensions
+           (about 32px tall) so every tag renders at the same small height it has in
+           the normal layout, whatever its line name; a photo is far larger, hits the
+           44px cap and keeps its aspect. Forcing a fixed height did the opposite:
+           wide tags shrank under the width cap and sat lower than narrow ones. */
+        height: auto;
         width: auto;
-        max-width: 120px;
-        object-fit: contain;
+        max-height: 44px;
+        max-width: 96px;
         border-radius: 4px;
       }
       ha-card.compact .alert-text {
