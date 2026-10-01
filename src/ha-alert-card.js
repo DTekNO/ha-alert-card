@@ -197,6 +197,9 @@ class HaAlertCard extends HTMLElement {
       show_image: config.show_image !== false,
       hide_when_no_alerts: config.hide_when_no_alerts || false,
       hide_when_all_dismissed: config.hide_when_all_dismissed || false,
+      // One line per alert — thumbnail, title over a one-line qualifier, source and
+      // time at the right. For dense lists in a sections grid; see _renderAlert.
+      compact: config.compact || false,
       sort_by: config.sort_by || 'severity',
       tap_action: config.tap_action || { action: 'none' },
       hold_action: config.hold_action || {},
@@ -708,7 +711,7 @@ class HaAlertCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
-      <ha-card>
+      <ha-card class="${this._config.compact ? 'compact' : ''}">
         <div class="card-header">
           <div class="card-header-left">
             <ha-icon icon="mdi:bell-alert-outline"></ha-icon>
@@ -850,6 +853,7 @@ class HaAlertCard extends HTMLElement {
       <div class="alert-item ${isExpanded ? 'expanded' : ''}" data-alert-id="${escapeHtml(alert._id)}">
         <div class="severity-bar" style="background: ${color}"></div>
         <div class="alert-content">
+          ${this._config.compact ? this._renderCompactRow(alert, safeImg, timeStr, isExpanded) : `
           <div class="alert-top-row">
             ${safeImg ? `<img class="alert-image" src="${escapeHtml(safeImg)}" alt="" />` : ''}
             ${this._config.show_source_badge ? `<span class="alert-source">${escapeHtml(alert._source)}</span>` : ''}
@@ -857,7 +861,7 @@ class HaAlertCard extends HTMLElement {
             ${this._config.show_time && timeStr ? `<span class="alert-time">${escapeHtml(timeStr)}</span>` : ''}
           </div>
           <div class="alert-title">${escapeHtml(alert.title)}</div>
-          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}
+          ${alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}`}
           ${isExpanded && alert.instruction ? `
             <div class="alert-instruction">
               <strong>Instruction:</strong> ${escapeHtml(alert.instruction)}
@@ -886,6 +890,38 @@ class HaAlertCard extends HTMLElement {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * The collapsed row in compact mode: one line of layout, two lines of text.
+   *
+   *   [thumb]  Title                SOURCE  area  2m ago  ⌄
+   *            message (one line, ellipsised)
+   *
+   * Each field keeps its meaning. `message` is description, so it is the subtitle;
+   * `area` is a place — a county, a line, a detector's station — so it sits with the
+   * source badge and the time, where a place belongs. That makes the logically
+   * correct mapping the one that renders best: the BirdNET card had been putting its
+   * station into the source *name* because the normal layout shows `area` in a row
+   * above the title, where a location looked wrong; here it needs no such workaround.
+   * The full message appears below the row when expanded, so nothing is lost, only
+   * deferred. Designed in a markdown-card prototype 30.09.2026.
+   */
+  _renderCompactRow(alert, safeImg, timeStr, isExpanded) {
+    return `
+          <div class="alert-row">
+            ${safeImg ? `<img class="alert-image" src="${escapeHtml(safeImg)}" alt="" />` : ''}
+            <div class="alert-text">
+              <div class="alert-title">${escapeHtml(alert.title)}</div>
+              ${alert.message ? `<div class="alert-subtitle">${escapeHtml(alert.message)}</div>` : ''}
+            </div>
+            <div class="alert-meta">
+              ${this._config.show_source_badge ? `<span class="alert-source">${escapeHtml(alert._source)}</span>` : ''}
+              ${this._config.show_area && alert.area ? `<span class="alert-area">${escapeHtml(alert.area)}</span>` : ''}
+              ${this._config.show_time && timeStr ? `<span class="alert-time">${escapeHtml(timeStr)}</span>` : ''}
+            </div>
+          </div>
+          ${isExpanded && alert.message ? `<div class="alert-message">${escapeHtml(alert.message)}</div>` : ''}`;
   }
 
   _getStyles() {
@@ -1085,6 +1121,78 @@ class HaAlertCard extends HTMLElement {
         -webkit-box-orient: vertical;
       }
       .alert-item.expanded .alert-message {
+        -webkit-line-clamp: unset;
+        display: block;
+      }
+
+      /* Compact rows — see _renderCompactRow. Scoped on the card so the normal
+         layout is untouched when the option is off. */
+      ha-card.compact .card-header {
+        padding: 8px 12px 6px;
+      }
+      ha-card.compact .card-header-left {
+        gap: 8px;
+      }
+      ha-card.compact .card-title {
+        font-size: var(--ha-font-size-m, 14px);
+      }
+      ha-card.compact .badge {
+        background: none;
+        color: var(--alert-card-badge-bg);
+        padding: 0;
+        min-width: 0;
+        font-size: var(--ha-font-size-m, 14px);
+        font-weight: 700;
+      }
+      ha-card.compact .dismiss-all {
+        font-size: var(--ha-font-size-xs, 11px);
+        padding: 2px 6px;
+      }
+      ha-card.compact .alert-content {
+        padding: 6px 6px 6px 10px;
+      }
+      ha-card.compact .alert-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      ha-card.compact .alert-image {
+        width: 44px;
+        height: 44px;
+        object-fit: cover;
+        border-radius: 4px;
+      }
+      ha-card.compact .alert-text {
+        flex: 1;
+        min-width: 0;
+      }
+      ha-card.compact .alert-title {
+        margin-bottom: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      ha-card.compact .alert-subtitle {
+        color: var(--secondary-text-color);
+        font-size: var(--ha-font-size-s, 12px);
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      ha-card.compact .alert-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      ha-card.compact .alert-time {
+        margin-left: 0;
+      }
+      ha-card.compact .alert-message {
+        margin-top: 6px;
         -webkit-line-clamp: unset;
         display: block;
       }
@@ -1361,6 +1469,10 @@ class HaAlertCardEditor extends HTMLElement {
                 <ha-switch id="hide-when-all-dismissed"></ha-switch>
                 <span>Hide card when all alerts are dismissed</span>
               </label>
+              <label class="switch-row">
+                <ha-switch id="compact"></ha-switch>
+                <span>Compact rows (one line per alert)</span>
+              </label>
             </div>
           </div>
         </ha-expansion-panel>
@@ -1474,6 +1586,8 @@ class HaAlertCardEditor extends HTMLElement {
     if (showImage) showImage.checked = config.show_image !== false;
     const hideWhenNoAlerts = root.getElementById('hide-when-no-alerts');
     if (hideWhenNoAlerts) hideWhenNoAlerts.checked = !!config.hide_when_no_alerts;
+    const compact = root.getElementById('compact');
+    if (compact) compact.checked = !!config.compact;
     const hideWhenAllDismissed = root.getElementById('hide-when-all-dismissed');
     if (hideWhenAllDismissed) hideWhenAllDismissed.checked = !!config.hide_when_all_dismissed;
 
@@ -1704,6 +1818,9 @@ class HaAlertCardEditor extends HTMLElement {
     });
     root.getElementById('hide-when-all-dismissed')?.addEventListener('change', (e) => {
       this._updateConfig('hide_when_all_dismissed', e.target.checked);
+    });
+    root.getElementById('compact')?.addEventListener('change', (e) => {
+      this._updateConfig('compact', e.target.checked);
     });
 
     // Tap action

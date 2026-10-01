@@ -121,6 +121,7 @@
       <button class="demo-btn" onclick="addAlert()">+ New alert</button>
       <button class="demo-btn" onclick="resetAlerts()">Reset</button>
       <button class="demo-btn" onclick="toggleTheme()">Toggle light/dark</button>
+      <button class="demo-btn" onclick="toggleCompact()">Toggle compact</button>
     </div>
   </div>
 
@@ -352,13 +353,30 @@ function getSeverityColor(severity) {
   return DEFAULT_SEVERITY_COLORS[severity] || '#9e9e9e';
 }
 
+let compact = false;
+function toggleCompact() { compact = !compact; render(); }
+
 function render() {
   const alerts = getAlerts();
   const container = document.getElementById('cardContainer');
 
   container.innerHTML = `
-    <div class="ha-card">
+    <div class="ha-card ${compact ? 'compact' : ''}">
       <style>
+        /* Compact rows — mirrors ha-alert-card.js _renderCompactRow / ha-card.compact */
+        .ha-card.compact .card-header { padding: 8px 12px 6px; }
+        .ha-card.compact .card-header-left { gap: 8px; }
+        .ha-card.compact .card-title { font-size: 14px; }
+        .ha-card.compact .badge { background: none; color: var(--error-color); padding: 0; min-width: 0; font-size: 14px; font-weight: 700; }
+        .ha-card.compact .dismiss-all { font-size: 11px; padding: 2px 6px; }
+        .ha-card.compact .alert-content { padding: 6px 6px 6px 10px; }
+        .ha-card.compact .alert-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .ha-card.compact .alert-text { flex: 1; min-width: 0; }
+        .ha-card.compact .alert-title { margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ha-card.compact .alert-subtitle { color: var(--secondary-text-color); font-size: 12px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ha-card.compact .alert-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; }
+        .ha-card.compact .alert-time { margin-left: 0; }
+        .ha-card.compact .alert-message { margin-top: 6px; -webkit-line-clamp: unset; display: block; }
         .card-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 16px 16px 12px; border-bottom: 1px solid var(--divider-color);
@@ -458,13 +476,26 @@ function renderAlert(alert) {
     <div class="alert-item ${isExpanded ? 'expanded' : ''}" onclick="handleTap('${alert._id}', '${alert.url}')">
       <div class="severity-bar" style="background: ${color}"></div>
       <div class="alert-content">
+        ${compact ? `
+        <div class="alert-row">
+          <div class="alert-text">
+            <div class="alert-title">${alert.title}</div>
+            ${alert.message ? `<div class="alert-subtitle">${alert.message}</div>` : ''}
+          </div>
+          <div class="alert-meta">
+            <span class="alert-source">${alert._source}</span>
+            ${alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
+            ${timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
+          </div>
+        </div>
+        ${isExpanded && alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}` : `
         <div class="alert-top-row">
           <span class="alert-source">${alert._source}</span>
           ${alert.area ? `<span class="alert-area">${alert.area}</span>` : ''}
           ${timeStr ? `<span class="alert-time">${timeStr}</span>` : ''}
         </div>
         <div class="alert-title">${alert.title}</div>
-        ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}
+        ${alert.message ? `<div class="alert-message">${alert.message}</div>` : ''}`}
         ${isExpanded && alert.instruction ? `
           <div class="alert-instruction"><strong>Instruction:</strong> ${alert.instruction}</div>
         ` : ''}

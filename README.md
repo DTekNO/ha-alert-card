@@ -118,6 +118,7 @@ show_source_badge: true          # Show source label per alert
 show_area: true                  # Show area/location
 show_time: true                  # Show relative time
 show_image: true                 # Show per-alert images (entity_picture by default)
+compact: false                   # One line per alert: thumbnail, title over message; source, area, time at right
 sort_by: severity                # 'severity' or 'time'
 dismiss_key: ha-alert-card-dismissed  # localStorage key (change if using multiple cards)
 tap_action:

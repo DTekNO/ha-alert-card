@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Compact rows** (`compact: true`). One line of layout per alert — a 44 px thumbnail,
+  the title over the message on one line (ellipsised), and source, area and time together
+  on the right — with a one-line header. A collapsed entry used three stacked lines beside
+  a wide empty expanse; three compact rows fit where one and a half did. Expanded content
+  is unchanged, and the full message appears below the row when expanded, so nothing is
+  lost. Each field keeps its meaning: the message describes, the area locates, so a
+  county, a transit line or a detector's station all land in the same place.
+
 ## [2026.9.1] — 2026-09-23
 
 ### Fixed
