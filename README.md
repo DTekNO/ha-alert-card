@@ -390,9 +390,13 @@ Should work with any integration that stores structured alerts in entity attribu
 Edit `src/ha-alert-card.js` and hard-refresh the browser — there is no build step and no dependencies.
 
 ```bash
-# Run the XSS regression tests (needs only node)
-node test/xss.test.js
+# Run the tests (needs only node)
+for t in test/*.test.js; do node "$t"; done
 ```
+
+`RELEASE_NOTES.md` is the body of the next GitHub release: the newest changelog section
+followed by a short standing description of the card. Update it with each release; the
+recipe is in a comment at the top of the file.
 
 `dist/ha-alert-card.js` is a generated copy of `src/`, committed because HACS resolves a plugin file from the release asset, then `dist/`, then the repo root. It is kept in step automatically: a workflow rebuilds it on pushes that touch `src/`, and the release workflow rebuilds it again at tag time with the version injected from the tag. Never edit `dist/` or the version string by hand.
 
