@@ -12,6 +12,18 @@
   lost. Each field keeps its meaning: the message describes, the area locates, so a
   county, a transit line or a detector's station all land in the same place.
 
+  Images render at their natural size, capped at 44 px tall and 96 px wide, so a
+  generated badge such as an Entur travel tag keeps its own small height while a photo
+  fills the row. An area that merely repeats the title is left out.
+
+### Fixed
+
+- **The list no longer jumps back to the top when you expand an entry.** Every render
+  rebuilt the card, so the scrolling list came back at the first alert — expanding
+  something halfway down, or a feed update arriving while you read, lost your place.
+  The scroll position is now carried across.
+- **The header bell sits centred on the title** instead of a few pixels low.
+
 ## [2026.9.1] — 2026-09-23
 
 ### Fixed

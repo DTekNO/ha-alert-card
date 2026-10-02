@@ -709,6 +709,12 @@ class HaAlertCard extends HTMLElement {
     // it remains grabbable/configurable while showing the clean empty state.
     const showDismissed = this._showDismissed;
 
+    // The card is rebuilt from a template on every render, which throws the
+    // scrolling list away and recreates it at the top. Expanding an entry
+    // halfway down, or a feed update arriving while reading, snapped the list
+    // back to the first alert. Carry the scroll position across the rebuild.
+    const scrollTop = this.shadowRoot.querySelector('.alert-list')?.scrollTop || 0;
+
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
       <ha-card class="${this._config.compact ? 'compact' : ''}">
@@ -745,6 +751,11 @@ class HaAlertCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+
+    if (scrollTop) {
+      const list = this.shadowRoot.querySelector('.alert-list');
+      if (list) list.scrollTop = scrollTop;
+    }
 
     // Attach event listeners
     this.shadowRoot.getElementById('dismissAll')?.addEventListener('click', () => this._dismissAll());
