@@ -310,6 +310,7 @@ Notes:
 - The device id is the last part of the URL on the device's page under Settings → Devices & services, or pick the device by name in the visual editor.
 - One device per provider and scope, so NWS plus ECCC is two sources. An alert seen through two devices is shown once.
 - `more-info` on a row opens that alert's own entity.
+- cap_alerts publishes a `web` link, so a tap navigates to it instead of expanding. To expand the row and show the description and instruction instead, add `mapping: { url: none }` to the source.
 
 ### Compact rows — bird detections from two stations
 
