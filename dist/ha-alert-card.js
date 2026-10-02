@@ -8,7 +8,7 @@
  * .github/workflows/release.yml.  Do not edit it by hand.
  */
 
-const CARD_VERSION = '2026.9.1+hot.2c7cde6';
+const CARD_VERSION = '2026.7.2';
 
 // Attribute consulted for each alert's inline image when a source does not name
 // one. Overridable per source via image_attribute; disable images with show_image.
@@ -709,6 +709,12 @@ class HaAlertCard extends HTMLElement {
     // it remains grabbable/configurable while showing the clean empty state.
     const showDismissed = this._showDismissed;
 
+    // The card is rebuilt from a template on every render, which throws the
+    // scrolling list away and recreates it at the top. Expanding an entry
+    // halfway down, or a feed update arriving while reading, snapped the list
+    // back to the first alert. Carry the scroll position across the rebuild.
+    const scrollTop = this.shadowRoot.querySelector('.alert-list')?.scrollTop || 0;
+
     this.shadowRoot.innerHTML = `
       <style>${this._getStyles()}</style>
       <ha-card class="${this._config.compact ? 'compact' : ''}">
@@ -745,6 +751,21 @@ class HaAlertCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+
+    if (scrollTop) {
+      // ha-card is a Lit element: its slot does not exist until its first
+      // update, a microtask away, so right now the new list has no layout box
+      // and an immediate scrollTop assignment is silently dropped. Restore once
+      // the card has rendered, and once more a frame later for images that
+      // were still sizing (the list is shorter until they have).
+      const list = this.shadowRoot.querySelector('.alert-list');
+      const card = this.shadowRoot.querySelector('ha-card');
+      const restore = () => { if (list?.isConnected !== false) list.scrollTop = scrollTop; };
+      (card?.updateComplete ?? Promise.resolve()).then(() => {
+        restore();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(restore);
+      });
+    }
 
     // Attach event listeners
     this.shadowRoot.getElementById('dismissAll')?.addEventListener('click', () => this._dismissAll());
@@ -967,6 +988,9 @@ class HaAlertCard extends HTMLElement {
         display: flex;
         align-items: center;
         gap: 10px;
+        /* The inline bell's baseline gap used to set this row's height; when the bell
+           became a flex box the header lost those pixels and read as cramped. */
+        min-height: 24px;
       }
       .card-header-left ha-icon {
         /* ha-icon is inline by default, so its box follows the line box and the
@@ -1143,14 +1167,6 @@ class HaAlertCard extends HTMLElement {
       }
       ha-card.compact .card-title {
         font-size: var(--ha-font-size-m, 14px);
-      }
-      ha-card.compact .badge {
-        background: none;
-        color: var(--alert-card-badge-bg);
-        padding: 0;
-        min-width: 0;
-        font-size: var(--ha-font-size-m, 14px);
-        font-weight: 700;
       }
       ha-card.compact .dismiss-all {
         font-size: var(--ha-font-size-xs, 11px);
