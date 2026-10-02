@@ -753,8 +753,18 @@ class HaAlertCard extends HTMLElement {
     `;
 
     if (scrollTop) {
+      // ha-card is a Lit element: its slot does not exist until its first
+      // update, a microtask away, so right now the new list has no layout box
+      // and an immediate scrollTop assignment is silently dropped. Restore once
+      // the card has rendered, and once more a frame later for images that
+      // were still sizing (the list is shorter until they have).
       const list = this.shadowRoot.querySelector('.alert-list');
-      if (list) list.scrollTop = scrollTop;
+      const card = this.shadowRoot.querySelector('ha-card');
+      const restore = () => { if (list?.isConnected !== false) list.scrollTop = scrollTop; };
+      (card?.updateComplete ?? Promise.resolve()).then(() => {
+        restore();
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(restore);
+      });
     }
 
     // Attach event listeners

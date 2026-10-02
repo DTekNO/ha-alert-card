@@ -70,19 +70,43 @@ function makeCard() {
   return card;
 }
 
-console.log('scroll position survives a re-render');
-{
-  const card = makeCard();
-  card._render();
-  check('first render starts at the top', card.shadowRoot.list.scrollTop === 0);
-  card.shadowRoot.list.scrollTop = 240;
-  card._toggleExpand('a');
-  check('list was rebuilt', card.shadowRoot.renders === 2);
-  check('scroll position carried across the rebuild', card.shadowRoot.list.scrollTop === 240,
-        `got ${card.shadowRoot.list.scrollTop}`);
-  card._render();
-  check('and across a plain re-render', card.shadowRoot.list.scrollTop === 240);
-}
+const tick = () => new Promise((r) => setTimeout(r, 0));
 
-if (failures) { console.log(`\n${failures} failing`); process.exit(1); }
-console.log('all scroll tests passed');
+(async () => {
+  console.log('scroll position survives a re-render');
+  {
+    const card = makeCard();
+    card._render();
+    await tick();
+    check('first render starts at the top', card.shadowRoot.list.scrollTop === 0);
+    card.shadowRoot.list.scrollTop = 240;
+    card._toggleExpand('a');
+    check('list was rebuilt', card.shadowRoot.renders === 2);
+    check('not restored synchronously (ha-card has no slot yet)', card.shadowRoot.list.scrollTop === 0);
+    await tick();
+    check('restored once the card has rendered', card.shadowRoot.list.scrollTop === 240,
+          `got ${card.shadowRoot.list.scrollTop}`);
+    card._render();
+    await tick();
+    check('and across a plain re-render', card.shadowRoot.list.scrollTop === 240);
+  }
+
+  console.log('ha-card.updateComplete is awaited when present');
+  {
+    const card = makeCard();
+    let resolve; const updateComplete = new Promise((r) => { resolve = r; });
+    const root = card.shadowRoot;
+    root.querySelector = (sel) => (sel === '.alert-list' ? root.list : sel === 'ha-card' ? { updateComplete } : null);
+    card._render();
+    root.list.scrollTop = 120;
+    card._render();
+    await tick();
+    check('nothing restored before the card finishes updating', root.list.scrollTop === 0);
+    resolve();
+    await tick();
+    check('restored after updateComplete resolves', root.list.scrollTop === 120, `got ${root.list.scrollTop}`);
+  }
+
+  if (failures) { console.log(`\n${failures} failing`); process.exit(1); }
+  console.log('all scroll tests passed');
+})();
