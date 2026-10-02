@@ -292,7 +292,7 @@ Notes:
 
 ### Compact rows — bird detections from two stations
 
-Two sensors whose `detections` attribute is a list of recent detections, shown as one row
+This example shows the use of compact mode. It can be used if you expect a lot of alerts and think the alert list is too dominating on your dashboard. Two sensors whose `detections` attribute is a list of recent detections, shown as one row
 each with `compact: true`. The species photo comes from each detection's `image` field,
 and expanding a row shows the sensor's `formatted_content`.
 
@@ -344,7 +344,7 @@ Alerts come from third-party feeds, so the card treats every feed-supplied value
 - **Image URLs are scheme-restricted** — `image_attribute` values must be `http(s)`, protocol-relative, site-relative, or `data:image/…`. Anything else renders no image.
 - **Link targets are scheme-restricted** — a feed's `url` opens externally only for `http(s)`; other values fall back to a more-info dialog rather than being followed.
 
-Escaping was added in **2026.8.1** after a report from [@frenck](https://github.com/frenck) during HACS review. If you are running an older version and consume any external feed, please update.
+Escaping was added in **2026.8.1** as a security measure. If you are running an older version and consume any external feed, please update.
 
 ## Compatibility
 
