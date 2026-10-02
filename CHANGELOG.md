@@ -6,7 +6,7 @@
 
 - **Compact rows** (`compact: true`). One line of layout per alert — a 44 px thumbnail,
   the title over the message on one line (ellipsised), and source, area and time together
-  on the right — with a one-line header. A collapsed entry used three stacked lines beside
+  on the right — with a tighter header that keeps the count pill. A collapsed entry used three stacked lines beside
   a wide empty expanse; three compact rows fit where one and a half did. Expanded content
   is unchanged, and the full message appears below the row when expanded, so nothing is
   lost. Each field keeps its meaning: the message describes, the area locates, so a

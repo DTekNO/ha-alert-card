@@ -1158,14 +1158,6 @@ class HaAlertCard extends HTMLElement {
       ha-card.compact .card-title {
         font-size: var(--ha-font-size-m, 14px);
       }
-      ha-card.compact .badge {
-        background: none;
-        color: var(--alert-card-badge-bg);
-        padding: 0;
-        min-width: 0;
-        font-size: var(--ha-font-size-m, 14px);
-        font-weight: 700;
-      }
       ha-card.compact .dismiss-all {
         font-size: var(--ha-font-size-xs, 11px);
         padding: 2px 6px;
