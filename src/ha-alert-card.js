@@ -252,18 +252,31 @@ class HaAlertCard extends HTMLElement {
   // --- Data Layer ---
 
   _getEntityFingerprint(hass) {
-    // Returns a string that changes only when one of our source entities changes.
+    // Returns a string that changes only when one of our source entities
+    // changes. A device source covers whichever entities are under the device
+    // right now, so one appearing or vanishing changes it too.
     if (!this._config.sources) return '';
+    const stamp = (id) => {
+      const state = hass.states[id];
+      return `${id}:${state ? state.last_updated : 'missing'}`;
+    };
     return this._config.sources.map(s => {
-      const state = hass.states[s.entity];
-      return state ? `${s.entity}:${state.last_updated}` : `${s.entity}:missing`;
+      const parts = [];
+      if (s.device) {
+        for (const reg of Object.values(hass.entities || {})) {
+          if (reg.device_id === s.device) parts.push(stamp(reg.entity_id));
+        }
+        if (!parts.length) parts.push(`${s.device}:none`);
+      }
+      if (s.entity) parts.push(stamp(s.entity));
+      return parts.join('|');
     }).join('|');
   }
 
   _deriveDismissKey(sources) {
-    // Stable key derived from sorted entity IDs — unique per card config,
-    // consistent across reloads, no manual configuration needed.
-    const ids = sources.map(s => s.entity).sort().join(',');
+    // Stable key derived from sorted entity (or device) IDs — unique per card
+    // config, consistent across reloads, no manual configuration needed.
+    const ids = sources.map(s => s.entity || (s.device ? `device:${s.device}` : '')).sort().join(',');
     let hash = 0;
     for (let i = 0; i < ids.length; i++) {
       hash = (Math.imul(31, hash) + ids.charCodeAt(i)) | 0;

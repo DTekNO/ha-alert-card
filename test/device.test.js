@@ -142,5 +142,22 @@ console.log('device plus entity on one source');
         c._alerts.length === 1 && c._alerts[0].title === 'Gale', String(c._alerts.length));
 }
 
+console.log('refresh and dismiss bookkeeping know about devices');
+{
+  const c = makeCard([{ device: 'dev-nws' }]);
+  const h = c._hass;
+  const before = c._getEntityFingerprint(h);
+  check('fingerprint names the device entities', before.includes('tornado_warning_1f0c6a62') && !before.includes('undefined:'));
+  h.states['sensor.cap_alerts_nws_cap_alert_tornado_warning_1f0c6a62'].last_updated = 'later';
+  check('an updated alert entity changes it', c._getEntityFingerprint(h) !== before);
+  const mid = c._getEntityFingerprint(h);
+  h.entities['sensor.new'] = { entity_id: 'sensor.new', device_id: 'dev-nws' };
+  h.states['sensor.new'] = { state: 'severe', attributes: cap('Heat') };
+  check('a new alert entity under the device changes it', c._getEntityFingerprint(h) !== mid);
+  const kNws = c._deriveDismissKey([{ device: 'dev-nws' }]);
+  const kEccc = c._deriveDismissKey([{ device: 'dev-eccc' }]);
+  check('dismiss keys differ per device', kNws !== kEccc && kNws !== c._deriveDismissKey([{}]));
+}
+
 if (failures) { console.log(`\n${failures} failing`); process.exit(1); }
 console.log('all device tests passed');
