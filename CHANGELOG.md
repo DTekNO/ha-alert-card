@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Device sources** (`device: <id>`): every non-diagnostic entity under a device is read
+  as an alert, gathered afresh on each refresh, for integrations that create one entity
+  per alert (cap_alerts, NINA). `attribute` defaults to `_self`. Refs #1.
+- `_self` and single-object attributes documented in the README; both already worked.
+
+### Changed
+
+- Unmapped `time`, `url` and `area` also try the CAP names `onset`, `web` and `area_desc`.
+- A `_self` entity in state `unknown` counts as an alert when its attributes carry one.
+- The same alert id reaching the card twice is shown once.
+
 ## [2026.10.1] - 2026-10-02
 
 ### Added

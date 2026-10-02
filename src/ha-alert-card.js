@@ -57,6 +57,23 @@ const DEFAULT_MAPPING = {
   instruction: 'instruction', // CAP: <instruction>
 };
 
+// Field names tried in order when the user has not mapped a field. CAP
+// integrations disagree on three names: single-sensor feeds publish
+// starttime, url and area; per-alert-entity ones (cap_alerts) publish the
+// CAP originals onset, web and area_desc.
+const DEFAULT_FIELD_ALIASES = {
+  time: ['starttime', 'onset', 'effective'],
+  url: ['url', 'web'],
+  area: ['area', 'area_desc', 'areaDesc'],
+};
+
+// Attributes every HA entity may carry regardless of payload. An entity in
+// state `unknown` with nothing beyond these has no alert to show.
+const HOUSEKEEPING_ATTRS = new Set([
+  'friendly_name', 'icon', 'device_class', 'state_class', 'unit_of_measurement',
+  'attribution', 'entity_picture', 'supported_features', 'restored',
+]);
+
 // Default severity → color mapping (supports CAP severity values + common alternatives)
 const DEFAULT_SEVERITY_COLORS = {
   // CAP standard severity values
@@ -316,39 +333,26 @@ class HaAlertCard extends HTMLElement {
     const seenIds = new Set();
 
     for (const source of this._config.sources) {
-      const entity = this._hass.states[source.entity];
-      if (!entity) continue;
-
       const mapping = { ...DEFAULT_MAPPING, ...(source.mapping || {}) };
-      const attribute = source.attribute || 'alerts';
-
-      let items;
-
-      if (attribute === '_self') {
-        // _self mode: treat entity.attributes as a single alert item
-        // Skip if entity state indicates no active alert
-        const skipStates = ['normal', '0', 'unavailable', 'unknown', 'none', 'ok', 'idle'];
-        if (skipStates.includes((entity.state || '').toLowerCase())) continue;
-        items = [entity.attributes];
-      } else {
-        const raw = entity.attributes[attribute];
-        if (Array.isArray(raw)) {
-          items = raw;
-        } else if (raw && typeof raw === 'object') {
-          // Single object attribute (not array) — wrap as single item
-          items = [raw];
-        } else {
-          // Attribute missing, null, or primitive — skip this entity
-          continue;
+      const userMapped = source.mapping || {};
+      // A field the user mapped is read exactly as given; an unmapped one
+      // tries each default name in turn.
+      const field = (item, key) => {
+        if (userMapped[key]) return this._resolveField(item, userMapped[key]);
+        for (const name of DEFAULT_FIELD_ALIASES[key] || [DEFAULT_MAPPING[key]]) {
+          const v = this._resolveField(item, name);
+          if (v !== undefined && v !== null && v !== '') return v;
         }
-      }
-
+        return undefined;
+      };
+      const sourceIdx = this._config.sources.indexOf(source);
       const filterExpired = source.filter_expired !== false; // default true
 
+      for (const { entityId, items, sourceName } of this._collectSourceItems(source)) {
       for (const item of items) {
         // Filter expired/closed alerts
         if (filterExpired) {
-          const status = (this._resolveField(item, mapping.severity) || '').toLowerCase();
+          const status = (field(item, 'severity') || '').toLowerCase();
           if (status === 'expired' || status === 'closed') continue;
 
           // Also check valid_to timestamp if present
@@ -359,24 +363,26 @@ class HaAlertCard extends HTMLElement {
           }
         }
 
-        const alertId = String(this._resolveField(item, mapping.id) ||
-                        this._hashAlert(item, mapping));
+        const alertId = String(field(item, 'id') || this._hashAlert(item, mapping));
 
+        // The same alert reaching the card twice — through two devices, or
+        // two sources on one feed — is one row.
+        if (seenIds.has(alertId)) continue;
         seenIds.add(alertId);
 
         const alertObj = {
           _id: alertId,
-          _sourceIdx: this._config.sources.indexOf(source),
-          _source: source.name || entity.attributes.friendly_name || source.entity.split('.').pop(),
-          _entity: source.entity,
+          _sourceIdx: sourceIdx,
+          _source: sourceName,
+          _entity: entityId,
           _raw: item,
-          title: this._resolveField(item, mapping.title) || entity.attributes.friendly_name || 'Alert',
-          message: this._resolveField(item, mapping.message) || '',
-          severity: (this._resolveField(item, mapping.severity) || 'unknown').toLowerCase(),
-          time: this._resolveField(item, mapping.time) || '',
-          url: this._resolveField(item, mapping.url) || '',
-          area: this._resolveField(item, mapping.area) || '',
-          instruction: this._resolveField(item, mapping.instruction) || '',
+          title: field(item, 'title') || this._hass.states[entityId]?.attributes?.friendly_name || 'Alert',
+          message: field(item, 'message') || '',
+          severity: (field(item, 'severity') || 'unknown').toLowerCase(),
+          time: field(item, 'time') || '',
+          url: field(item, 'url') || '',
+          area: field(item, 'area') || '',
+          instruction: field(item, 'instruction') || '',
         };
 
         if (this._dismissed.has(alertId)) {
@@ -384,6 +390,7 @@ class HaAlertCard extends HTMLElement {
         } else {
           allAlerts.push(alertObj);
         }
+      }
       }
     }
 
@@ -440,6 +447,57 @@ class HaAlertCard extends HTMLElement {
       value = value[part];
     }
     return value;
+  }
+
+  // A source names one entity, or a device, or both. Under a device every
+  // non-diagnostic entity is read, gathered afresh each refresh: integrations
+  // that create one entity per alert (cap_alerts, NINA) add and remove them
+  // every poll, so a hand-listed entity id would be stale within the hour.
+  // Returns [{ entityId, items, sourceName }], one per entity with alerts.
+  _collectSourceItems(source) {
+    const out = [];
+    const attribute = source.attribute || (source.device ? '_self' : 'alerts');
+    const add = (entityId, sourceName) => {
+      const entity = this._hass.states[entityId];
+      if (!entity) return;
+      const items = this._itemsFromEntity(entity, attribute);
+      if (items) out.push({ entityId, items, sourceName });
+    };
+    if (source.device) {
+      const device = this._hass.devices?.[source.device];
+      const deviceName = source.name || device?.name_by_user || device?.name || source.device;
+      for (const reg of Object.values(this._hass.entities || {})) {
+        // Config and diagnostic entities (counts, refresh buttons) never carry an alert.
+        if (reg.device_id !== source.device || reg.entity_category) continue;
+        add(reg.entity_id, deviceName);
+      }
+    }
+    if (source.entity) {
+      const entity = this._hass.states[source.entity];
+      add(source.entity,
+        source.name || entity?.attributes?.friendly_name || source.entity.split('.').pop());
+    }
+    return out;
+  }
+
+  // The alert items one entity contributes: the list (or single object) in
+  // `attribute`, or with `_self` the entity's own attributes as one alert.
+  // null means nothing to show.
+  _itemsFromEntity(entity, attribute) {
+    if (attribute === '_self') {
+      const state = (entity.state || '').toLowerCase();
+      const skipStates = ['normal', '0', 'unavailable', 'unknown', 'none', 'ok', 'idle'];
+      if (!skipStates.includes(state)) return [entity.attributes];
+      // `unknown` doubles as a CAP severity. An entity in that state whose
+      // attributes carry more than HA's housekeeping is an alert, not a blank.
+      const hasPayload = state === 'unknown' &&
+        Object.keys(entity.attributes || {}).some((k) => !HOUSEKEEPING_ATTRS.has(k));
+      return hasPayload ? [entity.attributes] : null;
+    }
+    const raw = entity.attributes[attribute];
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') return [raw];
+    return null;
   }
 
   _hashAlert(item, mapping) {
@@ -1640,7 +1698,7 @@ class HaAlertCardEditor extends HTMLElement {
           <div class="source-header-left">
             <ha-icon icon="mdi:drag" class="drag-handle" style="--mdc-icon-size: 18px; opacity: 0.4; cursor: grab;"></ha-icon>
             <ha-icon icon="mdi:${hasMapping ? 'code-braces' : 'flash-auto'}" style="--mdc-icon-size: 18px; opacity: 0.6;"></ha-icon>
-            <span class="source-entity-label">${source.entity || 'New source'}</span>
+            <span class="source-entity-label">${escapeHtml(source.entity || (source.device ? `Device ${this._deviceLabel(source.device)}` : 'New source'))}</span>
             ${!hasMapping ? '<span class="cap-badge">CAP</span>' : ''}
           </div>
           <div class="source-header-right">
@@ -1682,6 +1740,26 @@ class HaAlertCardEditor extends HTMLElement {
               const friendly = this._hass?.states[eid]?.attributes?.friendly_name || '';
               return `<option value="${eid}">${friendly ? friendly + ' — ' + eid : eid}</option>`;
             }).join('')}
+          </datalist>
+        </div>
+
+        <!-- Device: every entity under it is read, for one-entity-per-alert integrations -->
+        <div class="entity-select-wrapper">
+          <label class="entity-select-label">Device (instead of, or as well as, an entity)</label>
+          <input
+            type="text"
+            class="source-field-input"
+            data-idx="${idx}"
+            data-field="device"
+            value="${escapeHtml(source.device || '')}"
+            placeholder="Every entity under the device becomes an alert"
+            list="device-list-${idx}"
+            autocomplete="off"
+            title="For integrations that create one entity per alert and remove it when the alert ends (e.g. cap_alerts). Entities are gathered afresh on every refresh; diagnostic entities are skipped. Attribute defaults to _self."
+          />
+          <datalist id="device-list-${idx}">
+            ${this._getDeviceOptions().map(([id, name]) =>
+              `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`).join('')}
           </datalist>
         </div>
 
@@ -2050,7 +2128,7 @@ class HaAlertCardEditor extends HTMLElement {
     this._config = { ...this._config, sources };
     this._fireChanged();
     // Re-render to update header label
-    if (field === 'entity') this._render();
+    if (field === 'entity' || field === 'device') this._render();
   }
 
   _updateMapping(idx, key, value) {
@@ -2066,6 +2144,18 @@ class HaAlertCardEditor extends HTMLElement {
     if (!sources[idx].mapping) delete sources[idx].mapping;
     this._config = { ...this._config, sources };
     this._fireChanged();
+  }
+
+  _getDeviceOptions() {
+    const devices = this._hass?.devices || {};
+    return Object.values(devices)
+      .map((d) => [d.id, d.name_by_user || d.name || d.id])
+      .sort((a, b) => a[1].localeCompare(b[1]));
+  }
+
+  _deviceLabel(id) {
+    const d = this._hass?.devices?.[id];
+    return d?.name_by_user || d?.name || id;
   }
 
   _getEntityOptions() {

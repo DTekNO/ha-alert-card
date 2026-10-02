@@ -154,9 +154,10 @@ sources:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `entity` | string | **required** | Entity ID |
-| `name` | string | entity name | Source badge label |
-| `attribute` | string | `alerts` | Attribute containing the alert array |
+| `entity` | string | required unless `device` is set | Entity ID |
+| `device` | string | — | HA device id. Every non-diagnostic entity under the device is read, gathered afresh on each refresh, for integrations that create one entity per alert and remove it when the alert ends ([cap_alerts](https://github.com/seevee/cap_alerts), NINA). `attribute` defaults to `_self`. The id is the last part of the device page URL; the visual editor lists devices by name. |
+| `name` | string | entity or device name | Source badge label |
+| `attribute` | string | `alerts` | Attribute holding the alerts: a list, or a single alert object. `_self` reads the entity's own attributes as one alert, with states such as `normal`, `0`, `ok`, `idle`, `none`, `unavailable` meaning no alert (`unknown` too, unless the attributes carry an alert). |
 | `detail_attribute` | string | `formatted_content` | Attribute rendered as markdown when an alert is expanded. Checked on the per-alert item first (`alert._raw`), then falls back to the entity attribute. |
 | `image_attribute` | string | `entity_picture` | Attribute name for an image shown in each alert row (32px high). Checked on the per-alert item first, then falls back to the entity attribute. Defaults to `entity_picture`, so most entities need no configuration — set this only to use a different attribute. To turn images off, use `show_image: false`. |
 | `mapping` | object | CAP defaults | Field name mapping (see below) |
@@ -168,10 +169,10 @@ sources:
 | `title` | `event` | Alert headline |
 | `message` | `description` | Alert body text |
 | `severity` | `severity` | Severity level for color coding |
-| `time` | `starttime` | Timestamp (ISO 8601) |
+| `time` | `starttime`, then `onset`, `effective` | Timestamp (ISO 8601) |
 | `id` | `id` | Unique identifier for dismiss tracking |
-| `url` | `url` | Link for tap action |
-| `area` | `area` | Geographic area |
+| `url` | `url`, then `web` | Link for tap action |
+| `area` | `area`, then `area_desc` | Geographic area |
 | `instruction` | `instruction` | Action instruction (shown when expanded) |
 
 ### Built-in severity colors
@@ -289,6 +290,26 @@ Notes:
 - Filter by state with `?area=CA`, `?area=TX`, etc. Without a filter the full US feed can be very large.
 - `properties.severity` values are CAP-standard (`Extreme`/`Severe`/`Moderate`/`Minor`) and map directly to the card's built-in color scheme.
 - `detail_attribute: properties.description` shows the full description (with `* bullet` formatting) when an alert is expanded. The `instruction` mapping surfaces safety instructions below the description.
+
+### One entity per alert (cap_alerts)
+
+[cap_alerts](https://github.com/seevee/cap_alerts) creates one sensor per active alert
+and groups them under one device per provider. Point a source at the device and the card
+follows the entities as they come and go; its CAP attribute names are read without a
+mapping.
+
+```yaml
+type: custom:ha-alert-card
+title: Weather alerts
+sources:
+  - device: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+    name: NWS
+```
+
+Notes:
+- The device id is the last part of the URL on the device's page under Settings → Devices & services, or pick the device by name in the visual editor.
+- One device per provider and scope, so NWS plus ECCC is two sources. An alert seen through two devices is shown once.
+- `more-info` on a row opens that alert's own entity.
 
 ### Compact rows — bird detections from two stations
 
