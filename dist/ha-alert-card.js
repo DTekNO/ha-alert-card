@@ -8,7 +8,7 @@
  * .github/workflows/release.yml.  Do not edit it by hand.
  */
 
-const CARD_VERSION = '2026.7.2';
+const CARD_VERSION = '2026.9.1+hot.2c7cde6';
 
 // Attribute consulted for each alert's inline image when a source does not name
 // one. Overridable per source via image_attribute; disable images with show_image.

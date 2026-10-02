@@ -967,6 +967,9 @@ class HaAlertCard extends HTMLElement {
         display: flex;
         align-items: center;
         gap: 10px;
+        /* The inline bell's baseline gap used to set this row's height; when the bell
+           became a flex box the header lost those pixels and read as cramped. */
+        min-height: 24px;
       }
       .card-header-left ha-icon {
         /* ha-icon is inline by default, so its box follows the line box and the
