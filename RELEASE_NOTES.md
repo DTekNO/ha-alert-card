@@ -39,8 +39,9 @@ per-source field mapping away.
 - **Any source** — a list attribute, a single alert object, the entity itself, or every
   entity under a device for integrations that create one entity per alert (cap_alerts,
   NINA). Several sources combine in one card.
-- **Two layouts** — full rows with expandable detail, or compact one-line rows with a
-  thumbnail for dense dashboards.
+- **Compact mode** (`compact: true`) — one line per alert with a thumbnail, title and
+  subtitle, and source, area and time on the right, for dense dashboards. The default
+  layout keeps full rows with expandable detail.
 - **Dismiss and restore** — per-alert dismiss stored server-side per HA user, synced across
   browsers and devices; dismissed alerts reviewable and restorable from the header.
 - **Severity colouring** — a colour bar keyed to severity, with CAP, Norwegian and generic
