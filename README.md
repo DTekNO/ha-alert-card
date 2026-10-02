@@ -290,6 +290,51 @@ Notes:
 - `properties.severity` values are CAP-standard (`Extreme`/`Severe`/`Moderate`/`Minor`) and map directly to the card's built-in color scheme.
 - `detail_attribute: properties.description` shows the full description (with `* bullet` formatting) when an alert is expanded. The `instruction` mapping surfaces safety instructions below the description.
 
+### Compact rows — bird detections from two stations
+
+Two sensors whose `detections` attribute is a list of recent detections, shown as one row
+each with `compact: true`. The species photo comes from each detection's `image` field,
+and expanding a row shows the sensor's `formatted_content`.
+
+![Compact mode example](images/compact-mode-example.png)
+
+```yaml
+type: custom:ha-alert-card
+title: Birdnet
+compact: true
+hide_when_no_alerts: true
+max_items: 5
+sources:
+  - entity: sensor.outside_birdnet_coast_history
+    name: Coast
+    attribute: detections
+    detail_attribute: formatted_content
+    image_attribute: image
+    mapping:
+      title: species
+      message: scientific_name
+      time: timestamp
+      id: detection_id
+  - entity: sensor.outside_birdnet_forest_history
+    name: Forest
+    attribute: detections
+    detail_attribute: formatted_content
+    image_attribute: image
+    mapping:
+      title: species
+      message: scientific_name
+      time: timestamp
+      id: detection_id
+grid_options:
+  columns: full
+  rows: auto
+```
+
+Notes:
+- `message` is the one-line subtitle under the title in compact mode; the full text also appears when a row is expanded.
+- `name` becomes the source badge on the right, so two feeds share one card and stay distinguishable.
+- `5 of 20` in the header means five rows are shown of twenty undismissed alerts (`max_items: 5`).
+
 ## Security
 
 Alerts come from third-party feeds, so the card treats every feed-supplied value as untrusted:
