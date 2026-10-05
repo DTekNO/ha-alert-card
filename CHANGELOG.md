@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026.10.3] - 2026-10-05
+
+### Changed
+
+- Default field order, from testing against cap_alerts' providers (refs #1): `web` is
+  tried before `url` for the link, since CAP feeds often put the raw source document in
+  `url`; `severity_normalized` before `severity`; and `sent` is the last fallback for
+  the time, for feeds that publish no onset. A user mapping is unaffected.
+
 ## [2026.10.2] - 2026-10-02
 
 ### Added

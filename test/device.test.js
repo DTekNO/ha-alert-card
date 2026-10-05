@@ -142,6 +142,29 @@ console.log('device plus entity on one source');
         c._alerts.length === 1 && c._alerts[0].title === 'Gale', String(c._alerts.length));
 }
 
+console.log('alias order follows cap_alerts semantics');
+{
+  const c = makeCard([{ device: 'dev-nws' }]);
+  const h = c._hass;
+  h.states['sensor.cap_alerts_nws_cap_alert_tornado_warning_1f0c6a62'].attributes = cap('Tornado Warning', {
+    url: 'https://api.weather.gov/alerts/urn:x.cap', web: 'https://alerts.example/page',
+    severity: 'Moderate', severity_normalized: 'severe',
+  });
+  h.states['sensor.cap_alerts_nws_cap_alert_flood_advisory_9a1b2c3d'].attributes = cap('Flood Advisory', {
+    onset: undefined, sent: '2026-10-03T01:00:00+00:00',
+  });
+  delete h.states['sensor.cap_alerts_nws_cap_alert_flood_advisory_9a1b2c3d'].attributes.onset;
+  c._updateAlerts();
+  const t = c._alerts.find((a) => a._raw.event === 'Tornado Warning');
+  const f = c._alerts.find((a) => a._raw.event === 'Flood Advisory');
+  check('web wins over url (url is the raw source document)', t.url === 'https://alerts.example/page', t.url);
+  check('severity_normalized wins over the raw severity', t.severity === 'severe', t.severity);
+  check('sent is the last time fallback', f.time === '2026-10-03T01:00:00+00:00', f.time);
+  const m = makeCard([{ device: 'dev-nws', mapping: { severity: 'severity' } }]);
+  m._hass = h; m._updateAlerts();
+  check('a user mapping still reads the raw field', m._alerts.find((a) => a._raw.event === 'Tornado Warning').severity === 'moderate');
+}
+
 console.log('refresh and dismiss bookkeeping know about devices');
 {
   const c = makeCard([{ device: 'dev-nws' }]);

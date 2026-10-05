@@ -1,4 +1,4 @@
-# HA Alert Card 2026.10.2
+# HA Alert Card 2026.10.3
 
 <!--
 Release-notes recipe (kept here so each release reads the same):
@@ -10,20 +10,14 @@ Release-notes recipe (kept here so each release reads the same):
 Paste the whole file (minus this comment) as the GitHub release body.
 -->
 
-### Added
-
-- **Device sources** (`device: <id>`): every non-diagnostic entity under a device is read
-  as an alert, gathered afresh on each refresh, for integrations that create one entity
-  per alert (cap_alerts, NINA). `attribute` defaults to `_self`. Refs #1.
-- `_self` and single-object attributes documented in the README; both already worked.
-
 ### Changed
 
-- Unmapped `time`, `url` and `area` also try the CAP names `onset`, `web` and `area_desc`.
-- A `_self` entity in state `unknown` counts as an alert when its attributes carry one.
-- The same alert id reaching the card twice is shown once.
+- Default field order, from testing against cap_alerts' providers (refs #1): `web` is
+  tried before `url` for the link, since CAP feeds often put the raw source document in
+  `url`; `severity_normalized` before `severity`; and `sent` is the last fallback for
+  the time, for feeds that publish no onset. A user mapping is unaffected.
 
-**Full Changelog**: https://github.com/DTekNO/ha-alert-card/compare/v2026.10.1...v2026.10.2
+**Full Changelog**: https://github.com/DTekNO/ha-alert-card/compare/v2026.10.2...v2026.10.3
 
 ---
 

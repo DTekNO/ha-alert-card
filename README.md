@@ -168,10 +168,10 @@ sources:
 |-------|-------------|-------------|
 | `title` | `event` | Alert headline |
 | `message` | `description` | Alert body text |
-| `severity` | `severity` | Severity level for color coding |
-| `time` | `starttime`, then `onset`, `effective` | Timestamp (ISO 8601) |
+| `severity` | `severity_normalized`, then `severity` | Severity level for color coding |
+| `time` | `starttime`, then `onset`, `effective`, `sent` | Timestamp (ISO 8601) |
 | `id` | `id` | Unique identifier for dismiss tracking |
-| `url` | `url`, then `web` | Link for tap action |
+| `url` | `web`, then `url` | Link for tap action (`web` first: in CAP, `url` is often the source document rather than a page) |
 | `area` | `area`, then `area_desc` | Geographic area |
 | `instruction` | `instruction` | Action instruction (shown when expanded) |
 
@@ -310,7 +310,7 @@ Notes:
 - The device id is the last part of the URL on the device's page under Settings → Devices & services, or pick the device by name in the visual editor.
 - One device per provider and scope, so NWS plus ECCC is two sources. An alert seen through two devices is shown once.
 - `more-info` on a row opens that alert's own entity.
-- cap_alerts publishes a `web` link, so a tap navigates to it instead of expanding. To expand the row and show the description and instruction instead, add `mapping: { url: none }` to the source.
+- cap_alerts publishes a `web` page link, so a tap navigates to it instead of expanding. To expand the row and show the description and instruction instead, add `mapping: { url: none }` to the source.
 
 ### Compact rows — bird detections from two stations
 
