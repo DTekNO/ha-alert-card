@@ -21,6 +21,13 @@ const DEFAULT_IMAGE_ATTRIBUTE = 'entity_picture';
 // alike), so a feed item containing e.g. <img src=x onerror=...> renders as
 // inert text instead of executing in the Home Assistant frontend.
 //
+// The rule holds in the visual editor too, and for two different reasons. Entity ids
+// and friendly names there come from integrations rather than from the user — the
+// one-entity-per-alert integrations this card is built for name their entities from
+// feed content — so they are third-party data by the same argument as an alert field.
+// The rest of the editor interpolates the user's own config, where the risk is their
+// own, but escaping it keeps this rule true everywhere rather than true in most places.
+//
 // Deliberately NOT escaped: the expandable detail (formatted_content), which
 // is assigned to <ha-markdown>.content as a property — ha-markdown renders it
 // with Home Assistant's own markdown sanitizer, preserving the intended
@@ -708,7 +715,7 @@ class HaAlertCard extends HTMLElement {
       <ha-card class="edit-placeholder">
         <div class="empty-state">
           <ha-icon icon="mdi:bell-sleep-outline"></ha-icon>
-          <div class="edit-placeholder-title">${this._config.title}</div>
+          <div class="edit-placeholder-title">${escapeHtml(this._config.title)}</div>
           <div class="edit-hint">Hidden here (${reason})<br>shown only while editing</div>
         </div>
       </ha-card>
@@ -1526,7 +1533,7 @@ class HaAlertCardEditor extends HTMLElement {
                 type="text"
                 class="source-field-input"
                 id="title-input"
-                value="${config.title || 'Alerts'}"
+                value="${escapeHtml(config.title || 'Alerts')}"
                 placeholder="Alerts"
               />
             </div>
@@ -1537,7 +1544,7 @@ class HaAlertCardEditor extends HTMLElement {
                   type="number"
                   class="source-field-input"
                   id="max-items-input"
-                  value="${config.max_items || 20}"
+                  value="${escapeHtml(config.max_items || 20)}"
                   min="1"
                   max="50"
                 />
@@ -1625,13 +1632,13 @@ class HaAlertCardEditor extends HTMLElement {
               ${tapAction.action === 'navigate' ? `
                 <div class="mapping-field-wrap" style="margin-top: 8px;">
                   <label class="mapping-field-label">Navigation path</label>
-                  <input type="text" class="source-field-input" id="tap-nav-path" value="${tapAction.navigation_path || ''}" placeholder="/lovelace/alerts" />
+                  <input type="text" class="source-field-input" id="tap-nav-path" value="${escapeHtml(tapAction.navigation_path || '')}" placeholder="/lovelace/alerts" />
                 </div>
               ` : ''}
               ${tapAction.action === 'url' ? `
                 <div class="mapping-field-wrap" style="margin-top: 8px;">
                   <label class="mapping-field-label">URL</label>
-                  <input type="text" class="source-field-input" id="tap-url" value="${tapAction.url_path || ''}" placeholder="https://..." />
+                  <input type="text" class="source-field-input" id="tap-url" value="${escapeHtml(tapAction.url_path || '')}" placeholder="https://..." />
                 </div>
               ` : ''}
             </div>
@@ -1648,13 +1655,13 @@ class HaAlertCardEditor extends HTMLElement {
               ${holdAction.action === 'navigate' ? `
                 <div class="mapping-field-wrap" style="margin-top: 8px;">
                   <label class="mapping-field-label">Navigation path</label>
-                  <input type="text" class="source-field-input" id="hold-nav-path" value="${holdAction.navigation_path || ''}" placeholder="/lovelace/alerts" />
+                  <input type="text" class="source-field-input" id="hold-nav-path" value="${escapeHtml(holdAction.navigation_path || '')}" placeholder="/lovelace/alerts" />
                 </div>
               ` : ''}
               ${holdAction.action === 'url' ? `
                 <div class="mapping-field-wrap" style="margin-top: 8px;">
                   <label class="mapping-field-label">URL</label>
-                  <input type="text" class="source-field-input" id="hold-url" value="${holdAction.url_path || ''}" placeholder="https://..." />
+                  <input type="text" class="source-field-input" id="hold-url" value="${escapeHtml(holdAction.url_path || '')}" placeholder="https://..." />
                 </div>
               ` : ''}
             </div>
@@ -1747,15 +1754,21 @@ class HaAlertCardEditor extends HTMLElement {
             class="entity-search"
             data-idx="${idx}"
             data-field="entity"
-            value="${selectedEntity}"
+            value="${escapeHtml(selectedEntity)}"
             placeholder="Type to search entities..."
             list="entity-list-${idx}"
             autocomplete="off"
           />
           <datalist id="entity-list-${idx}">
             ${entities.map(eid => {
+              // friendly_name is set by the integration, not by the user. The
+              // one-entity-per-alert integrations this card is built for — cap_alerts,
+              // NINA — name their entities straight from feed content, so this is a
+              // third-party string reaching the editor's innerHTML and has to be
+              // escaped exactly like a feed field. See the header comment.
               const friendly = this._hass?.states[eid]?.attributes?.friendly_name || '';
-              return `<option value="${eid}">${friendly ? friendly + ' — ' + eid : eid}</option>`;
+              const label = friendly ? `${friendly} — ${eid}` : eid;
+              return `<option value="${escapeHtml(eid)}">${escapeHtml(label)}</option>`;
             }).join('')}
           </datalist>
         </div>
@@ -1789,7 +1802,7 @@ class HaAlertCardEditor extends HTMLElement {
               class="source-field-input"
               data-idx="${idx}"
               data-field="name"
-              value="${source.name || ''}"
+              value="${escapeHtml(source.name || '')}"
               placeholder="Badge label"
             />
           </div>
@@ -1800,7 +1813,7 @@ class HaAlertCardEditor extends HTMLElement {
               class="source-field-input"
               data-idx="${idx}"
               data-field="attribute"
-              value="${source.attribute || ''}"
+              value="${escapeHtml(source.attribute || '')}"
               placeholder="alerts"
             />
           </div>
@@ -1813,7 +1826,7 @@ class HaAlertCardEditor extends HTMLElement {
               class="source-field-input"
               data-idx="${idx}"
               data-field="detail_attribute"
-              value="${source.detail_attribute || ''}"
+              value="${escapeHtml(source.detail_attribute || '')}"
               placeholder="formatted_content"
               title="Entity attribute to render as markdown when an alert is expanded. Defaults to 'formatted_content' if present."
             />
@@ -1827,7 +1840,7 @@ class HaAlertCardEditor extends HTMLElement {
               class="source-field-input"
               data-idx="${idx}"
               data-field="image_attribute"
-              value="${source.image_attribute || ''}"
+              value="${escapeHtml(source.image_attribute || '')}"
               placeholder="entity_picture (default)"
               title="Attribute name for an image shown in each alert row. Checked per-alert first, then on the entity. Leave blank to use entity_picture; use the Show image toggle to turn images off."
             />
@@ -1878,13 +1891,13 @@ class HaAlertCardEditor extends HTMLElement {
           ${(source.tap_action?.action === 'navigate' || source.hold_action?.action === 'navigate') ? `
             <div class="mapping-field-wrap" style="margin-top: 8px;">
               <label class="mapping-field-label">Navigation path</label>
-              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="navigation_path" value="${source.tap_action?.navigation_path || source.hold_action?.navigation_path || ''}" placeholder="/lovelace/..." />
+              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="navigation_path" value="${escapeHtml(source.tap_action?.navigation_path || source.hold_action?.navigation_path || '')}" placeholder="/lovelace/..." />
             </div>
           ` : ''}
           ${(source.tap_action?.action === 'url' || source.hold_action?.action === 'url') ? `
             <div class="mapping-field-wrap" style="margin-top: 8px;">
               <label class="mapping-field-label">URL</label>
-              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="url_path" value="${source.tap_action?.url_path || source.hold_action?.url_path || ''}" placeholder="https://..." />
+              <input type="text" class="source-field-input source-action-path" data-idx="${idx}" data-action-path="url_path" value="${escapeHtml(source.tap_action?.url_path || source.hold_action?.url_path || '')}" placeholder="https://..." />
             </div>
           ` : ''}
         </div>
@@ -1895,14 +1908,14 @@ class HaAlertCardEditor extends HTMLElement {
   _renderMappingField(sourceIdx, fieldName, value, label, placeholder) {
     return `
       <div class="mapping-field-wrap">
-        <label class="mapping-field-label">${label}</label>
+        <label class="mapping-field-label">${escapeHtml(label)}</label>
         <input
           type="text"
           class="mapping-input"
           data-idx="${sourceIdx}"
-          data-mapping="${fieldName}"
-          value="${value || ''}"
-          placeholder="${placeholder}"
+          data-mapping="${escapeHtml(fieldName)}"
+          value="${escapeHtml(value || '')}"
+          placeholder="${escapeHtml(placeholder)}"
         />
       </div>
     `;
