@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Visual editor no longer logs the card config to the browser console on every
+  `setConfig` and render. Found in review on hacs/default#9602.
+
 ## [2026.10.4] - 2026-10-19
 
 ### Fixed
