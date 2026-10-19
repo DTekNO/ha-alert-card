@@ -58,13 +58,17 @@ const DEFAULT_MAPPING = {
 };
 
 // Field names tried in order when the user has not mapped a field. CAP
-// integrations disagree on three names: single-sensor feeds publish
-// starttime, url and area; per-alert-entity ones (cap_alerts) publish the
-// CAP originals onset, web and area_desc.
+// integrations disagree on names: single-sensor feeds publish starttime, url
+// and area; per-alert-entity ones (cap_alerts) publish the CAP originals.
+// Order matters where both exist: cap_alerts' `url` is the source document
+// (raw CAP XML), `web` the human page, so `web` goes first; its
+// `severity_normalized` is the tier-derived level where the agency's raw
+// `severity` can disagree; `sent` covers feeds that publish no onset.
 const DEFAULT_FIELD_ALIASES = {
-  time: ['starttime', 'onset', 'effective'],
-  url: ['url', 'web'],
+  time: ['starttime', 'onset', 'effective', 'sent'],
+  url: ['web', 'url'],
   area: ['area', 'area_desc', 'areaDesc'],
+  severity: ['severity_normalized', 'severity'],
 };
 
 // Attributes every HA entity may carry regardless of payload. An entity in

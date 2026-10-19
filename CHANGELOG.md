@@ -11,7 +11,7 @@
 - Every other value the editor renders — card title, source name and attributes, the
   mapping fields, navigation and URL paths — is escaped too.
 
-## [2026.10.3] - 2026-10-05
+## [2026.10.3] - 2026-10-08
 
 ### Changed
 
