@@ -1,5 +1,4 @@
-# HA Alert Card 2026.10.3
-
+# HA Alert Card 2026.10.4
 <!--
 Release-notes recipe (kept here so each release reads the same):
   1. Copy the newest section of CHANGELOG.md below this heading, verbatim.
@@ -10,14 +9,16 @@ Release-notes recipe (kept here so each release reads the same):
 Paste the whole file (minus this comment) as the GitHub release body.
 -->
 
-### Changed
+### Fixed
 
-- Default field order, from testing against cap_alerts' providers (refs #1): `web` is
-  tried before `url` for the link, since CAP feeds often put the raw source document in
-  `url`; `severity_normalized` before `severity`; and `sent` is the last fallback for
-  the time, for feeds that publish no onset. A user mapping is unaffected.
+- **Visual editor: entity names from integrations are escaped.** The entity picker put
+  each entity's `friendly_name` into the editor's markup unescaped. Integrations that
+  name entities from feed content (cap_alerts, NINA) could therefore place markup there,
+  which ran when the card editor was opened. Found in review on hacs/default#9602.
+- Every other value the editor renders — card title, source name and attributes, the
+  mapping fields, navigation and URL paths — is escaped too.
 
-**Full Changelog**: https://github.com/DTekNO/ha-alert-card/compare/v2026.10.2...v2026.10.3
+**Full Changelog**: https://github.com/DTekNO/ha-alert-card/compare/v2026.10.3...v2026.10.4
 
 ---
 
@@ -44,7 +45,7 @@ per-source field mapping away.
   feed's own formatted content when it has some.
 - **Per-alert images** — from `entity_picture` automatically, or any attribute you name.
 - **Safe with untrusted feeds** — feed text is escaped and link and image URLs are
-  scheme-restricted.
+  scheme-restricted, in the card and in its visual editor.
 - **Visual editor** — full configuration in the card picker, no YAML required.
 - **Lightweight** — one plain JS file, no build step, no dependencies.
 
