@@ -1479,7 +1479,7 @@ class HaAlertCardEditor extends HTMLElement {
     this._hass = null;
     this._expandedSources = new Set();
     this._expandedPanels = new Set(['sources']); // sources starts expanded
-    this._debug = true; // Enable debug logging
+    this._debug = false; // Flip to true for editor console logging
   }
 
   _log(...args) {
