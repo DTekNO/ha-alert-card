@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Visual editor: entity names from integrations are escaped.** The entity picker put
+  each entity's `friendly_name` into the editor's markup unescaped. Integrations that
+  name entities from feed content (cap_alerts, NINA) could therefore place markup there,
+  which ran when the card editor was opened. Found in review on hacs/default#9602.
+- Every other value the editor renders — card title, source name and attributes, the
+  mapping fields, navigation and URL paths — is escaped too.
+
 ## [2026.10.3] - 2026-10-05
 
 ### Changed
