@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Extract version from tag
         id: get_version
@@ -25,6 +25,6 @@ jobs:
           sed -i "s/const CARD_VERSION = '[^']*'/const CARD_VERSION = '${{ steps.get_version.outputs.VERSION }}'/" dist/ha-alert-card.js
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/ha-alert-card.js

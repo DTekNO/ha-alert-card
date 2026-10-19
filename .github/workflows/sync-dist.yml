@@ -35,7 +35,7 @@ jobs:
     # Don't respond to this workflow's own commit.
     if: github.actor != 'github-actions[bot]'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Rebuild dist from src
         run: cp src/ha-alert-card.js dist/ha-alert-card.js
