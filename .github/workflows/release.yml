@@ -17,6 +17,49 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      # Debug logging writes the card config to the browser console on every
+      # setConfig and render, so it must not reach a stable release -- it shipped
+      # on in 2026.10.3 through 2026.10.5-beta before review caught it
+      # (hacs/default#9602). A beta is where you would deliberately want it, so
+      # there it is a warning and the release proceeds.
+      #
+      # Only src/ is scanned: the next step overwrites dist/ from it, so src/ is
+      # the only state that can reach the asset. A match in a comment fails the
+      # job too, which is the safe direction for a guard -- reword the comment.
+      #
+      # This runs on release:published, so a failure stops the *asset upload*, not
+      # the release: it already exists, and HACS then falls back to dist/ at that
+      # tag. Fix src/, then re-run this workflow from the Actions tab to attach
+      # the asset.
+      - name: Debug flags must be off for a stable release
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          hits=$(grep -rnEi '[A-Za-z_$.]*debug[A-Za-z_$]*[[:space:]]*=[[:space:]]*true' src/ || true)
+          if [ -z "$hits" ]; then
+            echo "No debug flag left on in src/."
+            exit 0
+          fi
+
+          # Pre-release either by the tag's suffix or by the box ticked on the
+          # release itself, so forgetting one of the two does not fail the other.
+          prerelease=0
+          case "$VERSION" in
+            *-beta*|*-alpha*|*-rc*) prerelease=1 ;;
+          esac
+          # An if, not `[ ... ] && ...`: the runner's shell is `bash -e`, where a
+          # false test as the last command of an && list aborts the step.
+          if [ "$PRERELEASE" = "true" ]; then prerelease=1; fi
+
+          echo "$hits"
+          if [ "$prerelease" = 1 ]; then
+            echo "::warning title=Debug logging is on::Allowed: $VERSION is a pre-release."
+            exit 0
+          fi
+          echo "::error title=Debug logging is on::$VERSION is a stable release. Set the flag(s) above to false, or publish this as a pre-release."
+          exit 1
+
       - name: Build dist from src
         run: cp src/ha-alert-card.js dist/ha-alert-card.js
 
